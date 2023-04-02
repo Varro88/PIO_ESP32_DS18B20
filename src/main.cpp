@@ -20,9 +20,11 @@ void printAndShow(int row, String text);
 #define ONE_WIRE_BUS 19
 #define SEALEVELPRESSURE_HPA (1013.25)
 const float kPaToMmHg = 1.33322;
+const int MAIN_LOOP_DELAY_MS = 10*1000;
 const int SEND_TO_SERVER_DELAY_MS = 3*60*1000;
-const int MAIN_LOOP_DELAY_MS = 5000;
+const int GET_ALERTS_DELAY_MS = 45*1000;
 unsigned long lastSendMillis = millis() - SEND_TO_SERVER_DELAY_MS;
+unsigned long lastGetAlertsMillis = millis() - GET_ALERTS_DELAY_MS;
 const String LCD_DEGREES = "\xDF";
 
 const char* ntpServer = "ua.pool.ntp.org";
@@ -69,7 +71,7 @@ void setup() {
   Serial.begin(115200);
   
   //Diagnostic
-  SHORT_DIAGNOSTIC = "Last reset reasons: CPU0=" + getResetReason(rtc_get_reset_reason(0)) + " / CPU1=" + rtc_get_reset_reason(1);
+  SHORT_DIAGNOSTIC = "Last reset: CPU0=" + getResetReason(rtc_get_reset_reason(0)) + " / CPU1=" + rtc_get_reset_reason(1);
   
   //BME280
   bool status;    
@@ -121,16 +123,27 @@ void loop() {
   jsonData["pressure"] = bme280[2];
 
   Serial.println(SHORT_DIAGNOSTIC + "; esp32 T = " + (temprature_sens_read() - 32) / 1.8);
-  Serial.println("=====");
 
   if(millis() >= lastSendMillis + SEND_TO_SERVER_DELAY_MS) {
-    //sendDataToServer(jsonData);
+    //sendMeteoData(jsonData);
     lastSendMillis = millis();
+  }
+
+  if(millis() >= lastGetAlertsMillis + GET_ALERTS_DELAY_MS) {
+    lastGetAlertsMillis = millis();
+    if(getAlerts()) {
+      lcd.backlight();
+    }
+    else {
+      lcd.noBacklight();
+    }
+    lastGetAlertsMillis = millis();
   }
 
   printLocalTime();
   printDiagnostic(0);
   
+  Serial.println("=====");
   delay(MAIN_LOOP_DELAY_MS);
 }
 

@@ -3,5 +3,6 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-int sendDataToServer(DynamicJsonDocument jsonData);
 void connectToWiFi();
+int sendMeteoData(DynamicJsonDocument jsonData);
+bool getAlerts();
