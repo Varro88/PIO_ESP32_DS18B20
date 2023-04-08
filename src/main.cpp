@@ -41,6 +41,7 @@ int counter = 0;
 int bme280Address = 0x76;
 Adafruit_BME280 bme;
 String SHORT_DIAGNOSTIC = "";
+const int LIGHT_CONTROL_PIN = 32;
 
 const uint8_t number[] = {
   0xFF, 0x00, 0xFF, 0xFF, 0x01, 0xFF, //0
@@ -94,6 +95,7 @@ void setup() {
   {
     Serial.print("Can't set time");
   }
+  pinMode(LIGHT_CONTROL_PIN, INPUT);
   lcd.noBacklight();
 }
  
@@ -131,11 +133,14 @@ void loop() {
 
   if(millis() >= lastGetAlertsMillis + GET_ALERTS_DELAY_MS) {
     lastGetAlertsMillis = millis();
+    lcd.setCursor(15, 0);
     if(getAlerts()) {
-      lcd.backlight();
+      lcd.setBacklight(digitalRead(LIGHT_CONTROL_PIN));
+      lcd.print("ALERT");
     }
     else {
       lcd.noBacklight();
+      lcd.print("relax");
     }
     lastGetAlertsMillis = millis();
   }

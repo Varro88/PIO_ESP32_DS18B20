@@ -1,6 +1,8 @@
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+
+//All sensitive data is here in format `#define WIFI_SSID "MyHomeWiFi"`
 #include <secrets.h>
 
 const int WIFI_CONNECT_TIMEOUT_MS = 30*1000;
