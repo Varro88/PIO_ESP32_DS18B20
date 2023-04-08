@@ -26,11 +26,15 @@ const int GET_ALERTS_DELAY_MS = 45*1000;
 unsigned long lastSendMillis = millis() - SEND_TO_SERVER_DELAY_MS;
 unsigned long lastGetAlertsMillis = millis() - GET_ALERTS_DELAY_MS;
 const String LCD_DEGREES = "\xDF";
+const String DATETIME_FORMAT = "%A, %B %d %Y %H:%M:%S";
 
 const char* ntpServer = "ua.pool.ntp.org";
 const long gmtOffset_sec = 7200;
 const int daylight_offset_sec = 3600;
 const int daylight_enabled = 1;
+
+const int MIN_HOURS = 7;
+const int MAX_HOURS = 22;
 
 OneWire dsWire(ONE_WIRE_BUS);
 DallasTemperature ds18B20(&dsWire);
@@ -41,7 +45,6 @@ int counter = 0;
 int bme280Address = 0x76;
 Adafruit_BME280 bme;
 String SHORT_DIAGNOSTIC = "";
-const int LIGHT_CONTROL_PIN = 32;
 
 const uint8_t number[] = {
   0xFF, 0x00, 0xFF, 0xFF, 0x01, 0xFF, //0
@@ -89,22 +92,34 @@ void setup() {
   try
   {
     configTime(gmtOffset_sec, daylight_enabled * daylight_offset_sec, ntpServer);
-    printLocalTime();
   }
   catch (...)
   {
     Serial.print("Can't set time");
   }
-  pinMode(LIGHT_CONTROL_PIN, INPUT);
+
   lcd.noBacklight();
 }
  
 void loop() {
+  int hours = 0;
+  //Time
+  struct tm timeinfo;
+  lcd.setCursor(7, 1);
+  if(getLocalTime(&timeinfo))
+  {
+    hours = timeinfo.tm_hour;
+    lcd.print(&timeinfo, "%H:%M");
+    Serial.println(&timeinfo, DATETIME_FORMAT.c_str());
+  }
+  else {
+    Serial.println("Failed to get time");
+    lcd.print("--:--");
+  }
+
   //DS18B20
   ds18B20.requestTemperatures();
-  
   float ds18b20Temperature = NAN;
-
   ds18b20Temperature = ds18B20.getTempCByIndex(0);
   if(ds18b20Temperature < -50) {
     Serial.print("DS18B20 out sensor error");
@@ -117,7 +132,6 @@ void loop() {
                   "T1=" + String(bme280[0], 1) + LCD_DEGREES + "C",
                   "H=" + String(bme280[1], 1) + "%",
                   "P=" + String(bme280[2] / 1.33322, 1) + "mm");
-
   DynamicJsonDocument jsonData(1024);
   jsonData["temp_out"] = ds18b20Temperature;
   jsonData["temp_in"] = bme280[0];
@@ -135,7 +149,7 @@ void loop() {
     lastGetAlertsMillis = millis();
     lcd.setCursor(15, 0);
     if(getAlerts()) {
-      lcd.setBacklight(digitalRead(LIGHT_CONTROL_PIN));
+      lcd.setBacklight(hours >= MIN_HOURS && hours < MAX_HOURS);
       lcd.print("ALERT");
     }
     else {
@@ -145,8 +159,7 @@ void loop() {
     lastGetAlertsMillis = millis();
   }
 
-  printLocalTime();
-  printDiagnostic(0);
+  printAndShow(0, String(xPortGetFreeHeapSize()));
   
   Serial.println("=====");
   delay(MAIN_LOOP_DELAY_MS);
@@ -234,32 +247,9 @@ void printMeteoData(String t0, String t1, String h, String p)
   lcd.print(h);
 }
 
-void printLocalTime()
-{
-  struct tm timeinfo;
-  lcd.setCursor(7, 1);
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
-    lcd.print("--:--");
-  }
-  else
-  {
-    Serial.println(&timeinfo, "%A, %B %d %Y %H:%M:%S");
-    lcd.print(&timeinfo, "%H:%M");
-  }
-}
-
 void printAndShow(int row, String text) 
 {
   Serial.println(text);
-
   lcd.setCursor(0,row);
-  size_t value = lcd.print(text + "   ");
-  Serial.println(value);
-}
-
-void printDiagnostic(int rowIndex)
-{
-  lcd.setCursor(0, rowIndex);
-  lcd.print(xPortGetFreeHeapSize());
+  lcd.print(text);
 }
