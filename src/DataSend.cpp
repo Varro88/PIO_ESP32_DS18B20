@@ -7,6 +7,13 @@
 
 const int WIFI_CONNECT_TIMEOUT_MS = 30*1000;
 
+const int GET_ALERTS_FAILED = -1;
+const int NO_ALERTS = 0;
+const int ALERT_ON = 1;
+const int TOO_MANY_REQUEST = 429;
+
+#define ALL_OK 0;
+
 const String number[] = {"Автономна Республіка Крим", //0
  "Волинська область", //1
  "Вінницька область", //2
@@ -92,7 +99,7 @@ int sendMeteoData(DynamicJsonDocument jsonData)
   }
 }
 
-bool getAlerts() {
+int getAlerts() {
     if(WiFi.status() != WL_CONNECTED) {
     connectToWiFi();
   }
@@ -106,6 +113,12 @@ bool getAlerts() {
     int httpResponseCode = http.GET();
     Serial.print("Alerts HTTP code: ");
     Serial.println(httpResponseCode);
+
+    if(httpResponseCode == 429)
+    {
+      return TOO_MANY_REQUEST;
+    }
+
     String response = http.getString();
     Serial.println("Response:");
     Serial.println(response);
@@ -116,23 +129,23 @@ bool getAlerts() {
     if(status == 'A') 
     {
       Serial.println("ALERT - whole region");
-      return true;
+      return ALERT_ON;
     } 
     else if (status == 'P') 
     {
       Serial.println("ALERT - some district(s)");
-      return true;
+      return ALERT_ON;
     }
     else 
     {
       Serial.println("No alerts");
-      return false;
+      return NO_ALERTS;
     }
   }
   else
   {
     Serial.print("Failed to connect to WiFi. Status is: ");
     Serial.println(WiFi.status());
-    return false;
+    return GET_ALERTS_FAILED;
   }
 }

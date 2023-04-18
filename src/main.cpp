@@ -20,9 +20,9 @@ void printAndShow(int row, String text);
 #define ONE_WIRE_BUS 19
 #define SEALEVELPRESSURE_HPA (1013.25)
 const float kPaToMmHg = 1.33322;
-const int MAIN_LOOP_DELAY_MS = 10*1000;
+const int MAIN_LOOP_DELAY_MS = 15*1000;
 const int SEND_TO_SERVER_DELAY_MS = 3*60*1000;
-const int GET_ALERTS_DELAY_MS = 45*1000;
+const int GET_ALERTS_DELAY_MS = 30*1000;
 unsigned long lastSendMillis = millis() - SEND_TO_SERVER_DELAY_MS;
 unsigned long lastGetAlertsMillis = millis() - GET_ALERTS_DELAY_MS;
 const String LCD_DEGREES = "\xDF";
@@ -45,6 +45,7 @@ int counter = 0;
 int bme280Address = 0x76;
 Adafruit_BME280 bme;
 String SHORT_DIAGNOSTIC = "";
+int ALERTS_STATUS = -100;
 
 const uint8_t number[] = {
   0xFF, 0x00, 0xFF, 0xFF, 0x01, 0xFF, //0
@@ -145,18 +146,35 @@ void loop() {
     lastSendMillis = millis();
   }
 
-  if(millis() >= lastGetAlertsMillis + GET_ALERTS_DELAY_MS) {
+  if(millis() >= lastGetAlertsMillis + GET_ALERTS_DELAY_MS && ALERTS_STATUS != TOO_MANY_REQUEST) {
     lastGetAlertsMillis = millis();
     lcd.setCursor(15, 0);
-    if(getAlerts()) {
-      lcd.setBacklight(hours >= MIN_HOURS && hours < MAX_HOURS);
-      lcd.print("ALERT");
-    }
-    else {
-      lcd.noBacklight();
-      lcd.print("relax");
-    }
+    ALERTS_STATUS = getAlerts();
     lastGetAlertsMillis = millis();
+
+    switch (ALERTS_STATUS)
+    {
+      case ALERT_ON:
+        lcd.setBacklight(hours >= MIN_HOURS && hours < MAX_HOURS);
+        lcd.print("ALERT");
+        break;
+      case GET_ALERTS_FAILED:
+        lcd.print("N/A");
+        lcd.noBacklight();
+        break;
+      case NO_ALERTS:
+        lcd.noBacklight();
+        lcd.print("relax");
+        break;
+      case TOO_MANY_REQUEST:
+        lcd.noBacklight();
+        lcd.print("429");
+        Serial.println("[WARNING] TOO MANY REQUESTS");
+        break;
+      default:
+        lcd.noBacklight();
+        break;
+    }
   }
 
   printAndShow(0, String(xPortGetFreeHeapSize()));
