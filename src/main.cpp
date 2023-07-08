@@ -13,7 +13,7 @@
 String getResetReason(RESET_REASON reason);
 std::array<float, 3> getBME280Measurings();
 void printMeteoData(String t1, String t2, String h, String p);
-void printLocalTime();
+void printLocalTime(int column, int row, String format);
 void printDiagnostic(int rowIndex);
 void printAndShow(int row, String text);
 
@@ -35,6 +35,7 @@ const int daylight_enabled = 1;
 
 const int MIN_HOURS = 7;
 const int MAX_HOURS = 22;
+int hours = 0;
 
 OneWire dsWire(ONE_WIRE_BUS);
 DallasTemperature ds18B20(&dsWire);
@@ -45,7 +46,7 @@ int counter = 0;
 int bme280Address = 0x76;
 Adafruit_BME280 bme;
 String SHORT_DIAGNOSTIC = "";
-int ALERTS_STATUS = -100;
+Status ALERTS_STATUS = INIT;
 
 const uint8_t number[] = {
   0xFF, 0x00, 0xFF, 0xFF, 0x01, 0xFF, //0
@@ -103,20 +104,7 @@ void setup() {
 }
  
 void loop() {
-  int hours = 0;
-  //Time
-  struct tm timeinfo;
-  lcd.setCursor(7, 1);
-  if(getLocalTime(&timeinfo))
-  {
-    hours = timeinfo.tm_hour;
-    lcd.print(&timeinfo, "%H:%M");
-    Serial.println(&timeinfo, DATETIME_FORMAT.c_str());
-  }
-  else {
-    Serial.println("Failed to get time");
-    lcd.print("--:--");
-  }
+  printLocalTime(7, 1, "%H:%M");
 
   //DS18B20
   ds18B20.requestTemperatures();
@@ -148,7 +136,9 @@ void loop() {
 
   if(millis() >= lastGetAlertsMillis + GET_ALERTS_DELAY_MS && ALERTS_STATUS != TOO_MANY_REQUEST) {
     lastGetAlertsMillis = millis();
-    lcd.setCursor(15, 0);
+    lcd.setCursor(8, 0);
+
+    boolean previousStatus = ALERTS_STATUS;
     ALERTS_STATUS = getAlerts();
     lastGetAlertsMillis = millis();
 
@@ -156,15 +146,19 @@ void loop() {
     {
       case ALERT_ON:
         lcd.setBacklight(hours >= MIN_HOURS && hours < MAX_HOURS);
-        lcd.print("ALERT");
+        if(previousStatus == NO_ALERT || previousStatus == INIT) {
+          printLocalTime(0, 0, "%H:%M - ALERT");
+        }
         break;
       case GET_ALERTS_FAILED:
-        lcd.print("N/A");
+        printLocalTime(0, 0, "%H:%M - N/A");
         lcd.noBacklight();
         break;
-      case NO_ALERTS:
+      case NO_ALERT:
         lcd.noBacklight();
-        lcd.print("relax");
+        if(previousStatus == ALERT_ON || previousStatus == INIT) {
+          printLocalTime(0, 0, "%H:%M - relax");
+        }
         break;
       case TOO_MANY_REQUEST:
         lcd.noBacklight();
@@ -177,11 +171,28 @@ void loop() {
     }
   }
 
-  printAndShow(0, String(xPortGetFreeHeapSize()));
+  //printAndShow(0, String(xPortGetFreeHeapSize()));
   
   Serial.println("=====");
   delay(MAIN_LOOP_DELAY_MS);
 }
+
+void printLocalTime(int column, int row, String format) {
+  //Time
+  struct tm timeinfo;
+  lcd.setCursor(column, row);
+  if(getLocalTime(&timeinfo))
+  {
+    hours = timeinfo.tm_hour;
+    lcd.print(&timeinfo, format.c_str());
+    Serial.println(&timeinfo, DATETIME_FORMAT.c_str());
+  }
+  else {
+    Serial.println("Failed to get time");
+    lcd.print("--:--");
+  }
+}
+
 
 String getResetReason(RESET_REASON reason)
 {

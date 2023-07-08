@@ -1,18 +1,14 @@
 #include <ArduinoJson.h>
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <DataSend.h>
 
 //All sensitive data is here in format `#define WIFI_SSID "MyHomeWiFi"`
 #include <secrets.h>
 
-const int WIFI_CONNECT_TIMEOUT_MS = 30*1000;
-
-const int GET_ALERTS_FAILED = -1;
-const int NO_ALERTS = 0;
-const int ALERT_ON = 1;
-const int TOO_MANY_REQUEST = 429;
-
 #define ALL_OK 0;
+
+const int WIFI_CONNECT_TIMEOUT_MS = 30*1000;
 
 const String number[] = {"Автономна Республіка Крим", //0
  "Волинська область", //1
@@ -99,12 +95,14 @@ int sendMeteoData(DynamicJsonDocument jsonData)
   }
 }
 
-int getAlerts() {
-    if(WiFi.status() != WL_CONNECTED) {
+Status getAlerts() {
+  if(WiFi.status() != WL_CONNECTED)
+  {
     connectToWiFi();
   }
 
-  if(WiFi.status() == WL_CONNECTED){
+  if(WiFi.status() == WL_CONNECTED)
+  {
     HTTPClient http;
     http.begin(ALERTS_IOT_URL);
     String bearerToken = "Bearer " ALERTS_TOKEN;
@@ -120,7 +118,7 @@ int getAlerts() {
     }
 
     String response = http.getString();
-    Serial.println("Response:");
+    Serial.print("Response:");
     Serial.println(response);
 
     response.replace("\"", "");
@@ -139,7 +137,7 @@ int getAlerts() {
     else 
     {
       Serial.println("No alerts");
-      return NO_ALERTS;
+      return NO_ALERT;
     }
   }
   else
