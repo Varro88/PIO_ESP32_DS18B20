@@ -1,7 +1,5 @@
 #include <Arduino.h>
-#include <OneWire.h>
-#include <DallasTemperature.h>
-#include <Wire.h>
+#include <sensors/DS18B20.h>
 #include <LiquidCrystal_I2C.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_BME280.h>
@@ -17,7 +15,6 @@ void printLocalTime(int column, int row, String format);
 void printDiagnostic(int rowIndex);
 void printAndShow(int row, String text);
 
-#define ONE_WIRE_BUS 19
 #define SEALEVELPRESSURE_HPA (1013.25)
 const float kPaToMmHg = 1.33322;
 const int MAIN_LOOP_DELAY_MS = 15*1000;
@@ -37,9 +34,6 @@ const int MIN_HOURS = 7;
 const int MAX_HOURS = 22;
 int hours = 0;
 
-OneWire dsWire(ONE_WIRE_BUS);
-DallasTemperature ds18B20(&dsWire);
-DeviceAddress *sensorsUnique;
 int countSensors;
 LiquidCrystal_I2C lcd(0x27,20,4);
 int counter = 0;
@@ -73,7 +67,8 @@ uint8_t temprature_sens_read();
 
 void setup() {
   Wire.begin();
-  ds18B20.begin();
+  //DS18B20
+  initDS18B20();
   Serial.begin(115200);
   
   //Diagnostic
@@ -107,13 +102,7 @@ void loop() {
   printLocalTime(7, 1, "%H:%M");
 
   //DS18B20
-  ds18B20.requestTemperatures();
-  float ds18b20Temperature = NAN;
-  ds18b20Temperature = ds18B20.getTempCByIndex(0);
-  if(ds18b20Temperature < -50) {
-    Serial.print("DS18B20 out sensor error");
-    ds18b20Temperature = NAN;
-  }
+  float ds18b20Temperature = getDS18B20Value();
 
   //BME280
   std::array<float, 3> bme280 = getBME280Measurings();
@@ -178,7 +167,6 @@ void loop() {
 }
 
 void printLocalTime(int column, int row, String format) {
-  //Time
   struct tm timeinfo;
   lcd.setCursor(column, row);
   if(getLocalTime(&timeinfo))
