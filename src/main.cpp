@@ -11,9 +11,10 @@
 String getResetReason(RESET_REASON reason);
 std::array<float, 3> getBME280Measurings();
 void printMeteoData(String t1, String t2, String h, String p);
-void printLocalTime(int column, int row, String format);
+void printStatusWithTime(int column, int row, String format);
 void printDiagnostic(int rowIndex);
 void printAndShow(int row, String text);
+std::string getTimeString();
 
 #define SEALEVELPRESSURE_HPA (1013.25)
 const float kPaToMmHg = 1.33322;
@@ -24,6 +25,7 @@ unsigned long lastSendMillis = millis() - SEND_TO_SERVER_DELAY_MS;
 unsigned long lastGetAlertsMillis = millis() - GET_ALERTS_DELAY_MS;
 const String LCD_DEGREES = "\xDF";
 const String DATETIME_FORMAT = "%A, %B %d %Y %H:%M:%S";
+const char *TIME_FORMAT = "%H:%M";
 
 const char* ntpServer = "ua.pool.ntp.org";
 const long gmtOffset_sec = 7200;
@@ -99,7 +101,8 @@ void setup() {
 }
  
 void loop() {
-  printLocalTime(7, 1, "%H:%M");
+  lcd.setCursor(7, 1);
+  lcd.print(getTimeString().c_str());
 
   //DS18B20
   float ds18b20Temperature = getDS18B20Value();
@@ -127,7 +130,7 @@ void loop() {
     lastGetAlertsMillis = millis();
     lcd.setCursor(8, 0);
 
-    boolean previousStatus = ALERTS_STATUS;
+    Status previousStatus = ALERTS_STATUS;
     ALERTS_STATUS = getAlerts();
     lastGetAlertsMillis = millis();
 
@@ -135,18 +138,18 @@ void loop() {
     {
       case ALERT_ON:
         lcd.setBacklight(hours >= MIN_HOURS && hours < MAX_HOURS);
-        if(previousStatus == NO_ALERT || previousStatus == INIT) {
-          printLocalTime(0, 0, "%H:%M - ALERT");
+        if(previousStatus != ALERT_ON) {
+          printStatusWithTime(0, 0, "ALERT");
         }
         break;
       case GET_ALERTS_FAILED:
-        printLocalTime(0, 0, "%H:%M - N/A");
+        printStatusWithTime(0, 0, "N/A");
         lcd.noBacklight();
         break;
       case NO_ALERT:
         lcd.noBacklight();
-        if(previousStatus == ALERT_ON || previousStatus == INIT) {
-          printLocalTime(0, 0, "%H:%M - relax");
+        if(previousStatus != NO_ALERT) {
+          printStatusWithTime(0, 0, "relax");
         }
         break;
       case TOO_MANY_REQUEST:
@@ -166,21 +169,26 @@ void loop() {
   delay(MAIN_LOOP_DELAY_MS);
 }
 
-void printLocalTime(int column, int row, String format) {
+std::string getTimeString() {
   struct tm timeinfo;
-  lcd.setCursor(column, row);
   if(getLocalTime(&timeinfo))
   {
     hours = timeinfo.tm_hour;
-    lcd.print(&timeinfo, format.c_str());
-    Serial.println(&timeinfo, DATETIME_FORMAT.c_str());
+    char buffer[6];
+    strftime(buffer, sizeof(buffer), TIME_FORMAT, &timeinfo);
+    std::string timeString(buffer);
+    return timeString;
   }
   else {
-    Serial.println("Failed to get time");
-    lcd.print("--:--");
+    return "--:--";
   }
 }
 
+void printStatusWithTime(int column, int row, String message) {
+  std::string status = getTimeString() + " - " + message.c_str();
+  lcd.setCursor(column, row);
+  lcd.print(status.c_str());
+}
 
 String getResetReason(RESET_REASON reason)
 {
