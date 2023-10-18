@@ -114,6 +114,8 @@ Status getAlerts() {
 
     if(httpResponseCode == 429)
     {
+      Serial.println("[WARNING] TOO MANY REQUESTS");
+      Serial.println(http.getString());
       return TOO_MANY_REQUEST;
     }
 

@@ -21,6 +21,7 @@ const float kPaToMmHg = 1.33322;
 const int MAIN_LOOP_DELAY_MS = 15*1000;
 const int SEND_TO_SERVER_DELAY_MS = 3*60*1000;
 const int GET_ALERTS_DELAY_MS = 30*1000;
+const int TOO_MANY_REQUESTS_PAUSE_MS = 2*60*1000;
 unsigned long lastSendMillis = millis() - SEND_TO_SERVER_DELAY_MS;
 unsigned long lastGetAlertsMillis = millis() - GET_ALERTS_DELAY_MS;
 const String LCD_DEGREES = "\xDF";
@@ -58,6 +59,17 @@ const uint8_t number[] = {
   0x20, 0x20, 0x20, 0x20, 0x20, 0x20 //' '
 };
 
+byte transferIndicator[] = {
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B11111
+};
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -83,6 +95,8 @@ void setup() {
       Serial.println("Could not find a valid BME280 sensor, check wiring!");
       while (1);
   }
+
+  lcd.createChar(0, transferIndicator);
   lcd.init();
   lcd.backlight();
   printAndShow(2, "Please wait sys init");
@@ -128,12 +142,14 @@ void loop() {
 
   if(millis() >= lastGetAlertsMillis + GET_ALERTS_DELAY_MS && ALERTS_STATUS != TOO_MANY_REQUEST) {
     lastGetAlertsMillis = millis();
-    lcd.setCursor(8, 0);
+    lcd.setCursor(19, 0);
+    lcd.write(byte(0));
 
     Status previousStatus = ALERTS_STATUS;
     ALERTS_STATUS = getAlerts();
     lastGetAlertsMillis = millis();
-
+    lcd.setCursor(8, 0);
+    
     switch (ALERTS_STATUS)
     {
       case ALERT_ON:
@@ -153,9 +169,9 @@ void loop() {
         }
         break;
       case TOO_MANY_REQUEST:
-        lcd.noBacklight();
         lcd.print("429");
         Serial.println("[WARNING] TOO MANY REQUESTS");
+        lastGetAlertsMillis =+ TOO_MANY_REQUESTS_PAUSE_MS;
         break;
       default:
         lcd.noBacklight();
@@ -163,6 +179,8 @@ void loop() {
     }
   }
 
+  lcd.setCursor(19, 0);
+  lcd.print(" ");
   //printAndShow(0, String(xPortGetFreeHeapSize()));
   
   Serial.println("=====");
