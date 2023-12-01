@@ -31,7 +31,7 @@ const char *TIME_FORMAT = "%H:%M";
 const char* ntpServer = "ua.pool.ntp.org";
 const long gmtOffset_sec = 7200;
 const int daylight_offset_sec = 3600;
-const int daylight_enabled = 1;
+const int daylight_enabled = 0;
 
 const int MIN_HOURS = 7;
 const int MAX_HOURS = 22;
@@ -140,7 +140,7 @@ void loop() {
     lastSendMillis = millis();
   }
 
-  if(millis() >= lastGetAlertsMillis + GET_ALERTS_DELAY_MS && ALERTS_STATUS != TOO_MANY_REQUEST) {
+  if(millis() >= lastGetAlertsMillis + GET_ALERTS_DELAY_MS) {
     lastGetAlertsMillis = millis();
     lcd.setCursor(19, 0);
     lcd.write(byte(0));
