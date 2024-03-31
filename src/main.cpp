@@ -31,7 +31,7 @@ const char *TIME_FORMAT = "%H:%M";
 const char* ntpServer = "ua.pool.ntp.org";
 const long gmtOffset_sec = 7200;
 const int daylight_offset_sec = 3600;
-const int daylight_enabled = 0;
+const int daylight_enabled = 1;
 
 const int MIN_HOURS = 7;
 const int MAX_HOURS = 22;
@@ -93,7 +93,6 @@ void setup() {
   status = bme.begin(0x76);  
   if (!status) {
       Serial.println("Could not find a valid BME280 sensor, check wiring!");
-      while (1);
   }
 
   lcd.createChar(0, transferIndicator);
@@ -133,7 +132,7 @@ void loop() {
   jsonData["humidity"] = bme280[1];
   jsonData["pressure"] = bme280[2];
 
-  Serial.println(SHORT_DIAGNOSTIC + "; esp32 T = " + (temprature_sens_read() - 32) / 1.8);
+  Serial.println(SHORT_DIAGNOSTIC + "; esp32 T=" + (temprature_sens_read() - 32) / 1.8);
 
   if(millis() >= lastSendMillis + SEND_TO_SERVER_DELAY_MS) {
     //sendMeteoData(jsonData);
