@@ -38,7 +38,8 @@ const String number[] = {"Автономна Республіка Крим", // 
                          "Чернівецька область",       // 25
                          "Чернігівська область"};     // 26
 
-const int TARGET_REGION_INDEX = 21;
+const int TARGET_REGION_INDEX = 22;
+const String TARGET_REGION_INDEX_STR = "22";
 
 void connectToWiFi()
 {
@@ -116,7 +117,9 @@ Status getAlerts()
   }
 
   HTTPClient http;
-  http.begin(ALERTS_IOT_URL);
+  String targetUrl = String(ALERTS_REGION_IOT_URL);
+  targetUrl.replace("<id>", TARGET_REGION_INDEX_STR);
+  http.begin(targetUrl);
   String bearerToken = "Bearer " ALERTS_TOKEN;
   http.addHeader("Authorization", bearerToken);
   http.addHeader("Host", "api.alerts.in.ua");
@@ -143,7 +146,8 @@ Status getAlerts()
 
   response.replace("\"", "");
 
-  char status = response[TARGET_REGION_INDEX];
+  //char status = response[TARGET_REGION_INDEX];
+  char status = response[0];
   if (status == 'A')
   {
     Serial.println("ALERT - whole region");
@@ -152,7 +156,7 @@ Status getAlerts()
   else if (status == 'P')
   {
     Serial.println("ALERT - some district(s)");
-    return ALERT_ON;
+    return PARTIAL_ALERT;
   }
   else
   {

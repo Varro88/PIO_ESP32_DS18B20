@@ -8,6 +8,7 @@ enum Status {
     GET_ALERTS_FAILED,
     NO_ALERT,
     ALERT_ON,
+    PARTIAL_ALERT,
     TOO_MANY_REQUEST
 };
 
