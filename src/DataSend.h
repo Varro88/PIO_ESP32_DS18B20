@@ -5,11 +5,12 @@
 
 enum Status {
     INIT,
-    GET_ALERTS_FAILED,
     NO_ALERT,
     ALERT_ON,
     PARTIAL_ALERT,
-    TOO_MANY_REQUEST
+    TOO_MANY_REQUEST,
+    WIFI_FAILED,
+    CONNECTION_FAILED
 };
 
 void connectToWiFi();

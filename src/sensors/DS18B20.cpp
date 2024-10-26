@@ -10,6 +10,7 @@ DallasTemperature ds18B20(&dsWire);
 DeviceAddress *sensorsUnique;
 
 void initDS18B20() {
+    Wire.begin();
     ds18B20.begin();
 }
 

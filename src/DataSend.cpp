@@ -90,7 +90,7 @@ int sendMeteoData(DynamicJsonDocument jsonData)
     int httpResponseCode = http.POST(jsonString);
     Serial.print("JSON sending HTTP code: ");
     Serial.println(httpResponseCode);
-    Serial.println("Response:");
+    Serial.print("Response: ");
     Serial.println(http.getString());
     return httpResponseCode;
   }
@@ -113,7 +113,7 @@ Status getAlerts()
   {
     Serial.print("Failed to connect to WiFi. Status is: ");
     Serial.println(WiFi.status());
-    return GET_ALERTS_FAILED;
+    return WIFI_FAILED;
   }
 
   HTTPClient http;
@@ -130,7 +130,7 @@ Status getAlerts()
   if (httpResponseCode == -1)
   {
     Serial.println("[WARNING] Network request failed. No internet or alerts host is not accessible.");
-    return GET_ALERTS_FAILED;
+    return CONNECTION_FAILED;
   }
 
   if (httpResponseCode == 429)
@@ -141,7 +141,7 @@ Status getAlerts()
   }
 
   String response = http.getString();
-  Serial.print("Response:");
+  Serial.print("Response: ");
   Serial.println(response);
 
   response.replace("\"", "");
@@ -150,17 +150,14 @@ Status getAlerts()
   char status = response[0];
   if (status == 'A')
   {
-    Serial.println("ALERT - whole region");
     return ALERT_ON;
   }
   else if (status == 'P')
   {
-    Serial.println("ALERT - some district(s)");
     return PARTIAL_ALERT;
   }
   else
   {
-    Serial.println("No alerts");
     return NO_ALERT;
   }
 }
