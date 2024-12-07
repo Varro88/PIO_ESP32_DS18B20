@@ -127,12 +127,12 @@ void loop() {
                  "; esp32 T=" + (temprature_sens_read() - 32) / 1.8);
 
   if (millis() >= lastSendMillis + SEND_TO_SERVER_DELAY_MS) {
-    // DynamicJsonDocument jsonData(128);
-    // jsonData["temp_out"] = ds18b20Temperature;
-    // jsonData["temp_in"] = bme280[0];
-    // jsonData["humidity"] = bme280[1];
-    // jsonData["pressure"] = bme280[2];
-    //  sendMeteoData(jsonData);
+    DynamicJsonDocument jsonData(128);
+    //jsonData["temp_out"] = ds18b20Temperature;
+    jsonData["tempIn"] = ds18b20Temperature;
+    jsonData["humidity"] = bme280[1];
+    jsonData["pressure"] = bme280[2];
+    sendMeteoData(jsonData);
     lastSendMillis = millis();
   }
 
