@@ -3,13 +3,13 @@
 #include <Adafruit_BME280.h>
 #include <array>
 
-int bme280Address = 0x76;
+#define BME280_I2C_ADDRESS 0x76
 Adafruit_BME280 bme;
 
 void initBME280()
 {
     bool status;    
-    status = bme.begin(0x76);  
+    status = bme.begin(BME280_I2C_ADDRESS);
     if (!status) {
         Serial.println("Could not find a valid BME280 sensor, check wiring!");
     }

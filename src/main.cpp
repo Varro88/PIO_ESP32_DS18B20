@@ -5,6 +5,7 @@
 #include <rom/rtc.h>
 #include <sensors/BME280.h>
 #include <sensors/DS18B20.h>
+#include <sensors/MHZ19B.h>
 
 #include <array>
 
@@ -87,6 +88,9 @@ void setup() {
   // BME280
   initBME280();
 
+  // MHZ19B
+  //initMHZ19B();
+
   // Diagnostic
   SHORT_DIAGNOSTIC =
       "Last reset: CPU0=" + getResetReason(rtc_get_reset_reason(0)) +
@@ -117,6 +121,9 @@ void loop() {
 
   // BME280
   std::array<float, 3> bme280 = getBME280Measurings();
+
+  // MHZ19B
+  //getCO2Concentration();
 
   printMeteoData("T0=" + String(ds18b20Temperature, 1) + LCD_DEGREES + "C",
                  "T1=" + String(bme280[0], 1) + LCD_DEGREES + "C",
