@@ -6,6 +6,7 @@
 #include <sensors/BME280.h>
 #include <sensors/DS18B20.h>
 #include <sensors/MHZ19B.h>
+#include <Preferences.h>
 
 #include <array>
 
@@ -14,7 +15,7 @@
 
 String getResetReason(RESET_REASON reason);
 void processAlert();
-void printMeteoData(String t1, String t2, String h, String p);
+void printMeteoData(String t1, String t2, String h, String p, String c);
 void printStatusWithTime(int column, int row, String format);
 void printStatus(Status status);
 void printStatusTime();
@@ -36,10 +37,17 @@ const String LCD_DEGREES = "\xDF";
 const String DATETIME_FORMAT = "%A, %B %d %Y %H:%M:%S";
 const char *TIME_FORMAT = "%H:%M";
 
-const char *ntpServer = "ua.pool.ntp.org";
-const long gmtOffset_sec = 7200;
-const int daylight_offset_sec = 3600;
-const int daylight_enabled = 0;
+Preferences preferences;
+const char *PREFS_NAMESPACE = "generalPrefs";
+
+const char *NTP_SERVER = "ua.pool.ntp.org";
+const long GMT_OFFSET_SEC = 7200;
+const int DAYLIGHT_OFFSET_SEC = 3600;
+int PIN_DAYLIGHT_INVERT = 5;
+const char *PREF_DAYLIGHT = "IS_DAYLIGHT";
+
+const char *PREF_CALIB = "ALLOW_CALIB";
+int PIN_CALIBRATION_CO2 = 4;
 
 const int MIN_HOURS = 7;
 const int MAX_HOURS = 22;
@@ -82,6 +90,10 @@ uint8_t temprature_sens_read();
 void setup() {
   Serial.begin(115200);
 
+  lcd.init();
+  lcd.backlight();
+  printAndShow(2, "Please wait sys init");
+
   // DS18B20
   initDS18B20();
 
@@ -89,7 +101,7 @@ void setup() {
   initBME280();
 
   // MHZ19B
-  //initMHZ19B();
+  initMHZ19B();
 
   // Diagnostic
   SHORT_DIAGNOSTIC =
@@ -97,23 +109,44 @@ void setup() {
       " / CPU1=" + rtc_get_reset_reason(1);
 
   lcd.createChar(0, transferIndicator);
-  lcd.init();
-  lcd.backlight();
-  printAndShow(2, "Please wait sys init");
+
   connectToWiFi();
 
+  preferences.begin(PREFS_NAMESPACE);
+
   try {
-    configTime(gmtOffset_sec, daylight_enabled * daylight_offset_sec,
-               ntpServer);
+    pinMode(PIN_DAYLIGHT_INVERT, INPUT);
+    int readPinState = digitalRead(PIN_DAYLIGHT_INVERT);
+    bool currentDaylightState = preferences.getBool(PREF_DAYLIGHT, 0);
+    Serial.print("Is daylight time: ");
+    Serial.println(currentDaylightState);
+    if(readPinState== HIGH) {
+      currentDaylightState = !currentDaylightState;
+      preferences.putBool(PREF_DAYLIGHT, currentDaylightState);
+    }
+    configTime(GMT_OFFSET_SEC, currentDaylightState * DAYLIGHT_OFFSET_SEC,
+               NTP_SERVER);
   } catch (...) {
     Serial.print("Can't set time");
   }
+
+  preferences.putBool(PREF_CALIB, false);
+
+  bool calibrationAllowed = preferences.getBool(PREF_CALIB, false);
+  Serial.print("Is calibration allowed: ");
+  Serial.println(calibrationAllowed);
+  int calibrationPinState = digitalRead(PIN_CALIBRATION_CO2);
+  if(calibrationAllowed && calibrationPinState == HIGH) {
+    preferences.putBool(PREF_CALIB, false);
+    calibrate();
+  }
+  preferences.end();
 
   lcd.noBacklight();
 }
 
 void loop() {
-  lcd.setCursor(7, 1);
+  lcd.setCursor(15, 1);
   lcd.print(getTimeString());
 
   // DS18B20
@@ -123,12 +156,13 @@ void loop() {
   std::array<float, 3> bme280 = getBME280Measurings();
 
   // MHZ19B
-  //getCO2Concentration();
+  float co2Concentration = getCO2Concentration();
 
   printMeteoData("T0=" + String(ds18b20Temperature, 1) + LCD_DEGREES + "C",
                  "T1=" + String(bme280[0], 1) + LCD_DEGREES + "C",
                  "H=" + String(bme280[1], 1) + "%",
-                 "P=" + String(bme280[2] / 1.33322, 1) + "mm");
+                 "P=" + String(bme280[2] / 1.33322, 1) + "mm",
+                 "C=" + String(co2Concentration, 1) +  "ppm");
 
   Serial.println(SHORT_DIAGNOSTIC +
                  "; esp32 T=" + (temprature_sens_read() - 32) / 1.8);
@@ -136,9 +170,11 @@ void loop() {
   if (millis() >= lastSendMillis + SEND_TO_SERVER_DELAY_MS) {
     DynamicJsonDocument jsonData(128);
     //jsonData["temp_out"] = ds18b20Temperature;
+    //jsonData["co2"] = co2Concentration;
     jsonData["tempIn"] = ds18b20Temperature;
     jsonData["humidity"] = bme280[1];
     jsonData["pressure"] = bme280[2];
+    jsonData["co2"] = co2Concentration;
     sendMeteoData(jsonData);
     lastSendMillis = millis();
   }
@@ -266,11 +302,9 @@ String getResetReason(RESET_REASON reason) {
     case 6:
       return "SDIO_RESET"; /**<6,  Reset by SLC module, reset digital core*/
     case 7:
-      return "TG0WDT_SYS_RESET"; /**<7,  Timer Group0 Watch dog reset digital
-                                    core*/
+      return "TG0WDT_SYS_RESET"; /**<7,  Timer Group0 Watch dog reset digital core*/
     case 8:
-      return "TG1WDT_SYS_RESET"; /**<8,  Timer Group1 Watch dog reset digital
-                                    core*/
+      return "TG1WDT_SYS_RESET"; /**<8,  Timer Group1 Watch dog reset digital core*/
     case 9:
       return "RTCWDT_SYS_RESET"; /**<9,  RTC Watch dog Reset digital core*/
     case 10:
@@ -284,17 +318,15 @@ String getResetReason(RESET_REASON reason) {
     case 14:
       return "EXT_CPU_RESET"; /**<14, for APP CPU, reseted by PRO CPU*/
     case 15:
-      return "RTCWDT_BROWN_OUT_RESET"; /**<15, Reset when the vdd voltage is not
-                                          stable*/
+      return "RTCWDT_BROWN_OUT_RESET"; /**<15, Reset when the vdd voltage is not stable*/
     case 16:
-      return "RTCWDT_RTC_RESET"; /**<16, RTC Watch dog reset digital core and
-                                    rtc module*/
+      return "RTCWDT_RTC_RESET"; /**<16, RTC Watch dog reset digital core and rtc module*/
     default:
       return "N/A";
   }
 }
 
-void printMeteoData(String t0, String t1, String h, String p) {
+void printMeteoData(String t0, String t1, String h, String p, String c) {
   int halfLineSize = 10;
 
   Serial.println(t0);
@@ -324,6 +356,9 @@ void printMeteoData(String t0, String t1, String h, String p) {
     h += " ";
   }
   lcd.print(h);
+
+  lcd.setCursor(0, 1);
+  lcd.print(c);
 }
 
 void printAndShow(int row, String text) {
