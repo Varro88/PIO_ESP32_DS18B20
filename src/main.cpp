@@ -15,6 +15,8 @@
 
 String getResetReason(RESET_REASON reason);
 void processAlert();
+void processCalibration();
+void processDaylight();
 void printMeteoData(String t1, String t2, String h, String p, String c);
 void printStatusWithTime(int column, int row, String format);
 void printStatus(Status status);
@@ -26,7 +28,7 @@ String getTimeString();
 
 #define SEALEVELPRESSURE_HPA (1013.25)
 const float kPaToMmHg = 1.33322;
-const int MAIN_LOOP_DELAY_MS = 15 * 1000;
+const int MAIN_LOOP_DELAY_MS = 20 * 1000;
 const int SEND_TO_SERVER_DELAY_MS = 3 * 60 * 1000;
 const int GET_ALERTS_DELAY_MS = 15 * 1000;
 const int TOO_MANY_REQUESTS_PAUSE_MS = 2 * 60 * 1000;
@@ -90,8 +92,10 @@ uint8_t temprature_sens_read();
 void setup() {
   Serial.begin(115200);
 
+  //LCD
   lcd.init();
   lcd.backlight();
+  lcd.createChar(0, transferIndicator);
   printAndShow(2, "Please wait sys init");
 
   // DS18B20
@@ -104,42 +108,13 @@ void setup() {
   initMHZ19B();
 
   // Diagnostic
-  SHORT_DIAGNOSTIC =
-      "Last reset: CPU0=" + getResetReason(rtc_get_reset_reason(0)) +
-      " / CPU1=" + rtc_get_reset_reason(1);
-
-  lcd.createChar(0, transferIndicator);
+  SHORT_DIAGNOSTIC = "Last reset: CPU0=" + getResetReason(rtc_get_reset_reason(0)) + " / CPU1=" + rtc_get_reset_reason(1);
 
   connectToWiFi();
 
   preferences.begin(PREFS_NAMESPACE);
-
-  try {
-    pinMode(PIN_DAYLIGHT_INVERT, INPUT);
-    int readPinState = digitalRead(PIN_DAYLIGHT_INVERT);
-    bool currentDaylightState = preferences.getBool(PREF_DAYLIGHT, 0);
-    Serial.print("Is daylight time: ");
-    Serial.println(currentDaylightState);
-    if(readPinState== HIGH) {
-      currentDaylightState = !currentDaylightState;
-      preferences.putBool(PREF_DAYLIGHT, currentDaylightState);
-    }
-    configTime(GMT_OFFSET_SEC, currentDaylightState * DAYLIGHT_OFFSET_SEC,
-               NTP_SERVER);
-  } catch (...) {
-    Serial.print("Can't set time");
-  }
-
-  preferences.putBool(PREF_CALIB, false);
-
-  bool calibrationAllowed = preferences.getBool(PREF_CALIB, false);
-  Serial.print("Is calibration allowed: ");
-  Serial.println(calibrationAllowed);
-  int calibrationPinState = digitalRead(PIN_CALIBRATION_CO2);
-  if(calibrationAllowed && calibrationPinState == HIGH) {
-    preferences.putBool(PREF_CALIB, false);
-    calibrate();
-  }
+  processDaylight();
+  processCalibration();
   preferences.end();
 
   lcd.noBacklight();
@@ -185,6 +160,45 @@ void loop() {
 
   Serial.println("=====");
   delay(MAIN_LOOP_DELAY_MS);
+}
+
+void processCalibration() {
+  preferences.putBool(PREF_CALIB, false);
+
+  bool calibrationAllowed = preferences.getBool(PREF_CALIB, false);
+  Serial.print("Is calibration allowed: ");
+  Serial.println(calibrationAllowed);
+  int calibrationPinState = digitalRead(PIN_CALIBRATION_CO2);
+  Serial.print("Calibration pin state: ");
+  Serial.println(calibrationPinState);
+  if(calibrationAllowed && calibrationPinState == HIGH) {
+    Serial.println("Entering CO2 calib");
+    preferences.putBool(PREF_CALIB, false);
+    printAndShow(2, "CO2 calib in 1 min  ");
+    delay(60*1000);
+    printAndShow(2, "CO2 CALIB STARTED   ");
+    calibrate();
+    preferences.putBool(PREF_CALIB, false);
+  }
+
+  //setAutocalibration(false);
+}
+
+void processDaylight() {
+  try {
+    pinMode(PIN_DAYLIGHT_INVERT, INPUT);
+    int readPinState = digitalRead(PIN_DAYLIGHT_INVERT);
+    bool currentDaylightState = preferences.getBool(PREF_DAYLIGHT, 0);
+    Serial.print("Is daylight time: ");
+    Serial.println(currentDaylightState);
+    if(readPinState== HIGH) {
+      currentDaylightState = !currentDaylightState;
+      preferences.putBool(PREF_DAYLIGHT, currentDaylightState);
+    }
+    configTime(GMT_OFFSET_SEC, currentDaylightState * DAYLIGHT_OFFSET_SEC, NTP_SERVER);
+  } catch (...) {
+    Serial.print("Can't set time");
+  }
 }
 
 void processAlert() {
