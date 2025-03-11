@@ -180,7 +180,6 @@ void processCalibration() {
     calibrate();
     preferences.putBool(PREF_CALIB, false);
   }
-
   //setAutocalibration(false);
 }
 
@@ -203,10 +202,8 @@ void processDaylight() {
 
 void processAlert() {
   switchNetworkIndicator(true);
-  Status newStatus = getAlerts();
+  Status newStatus = getAlertsV2();
   lastGetAlertsMillis = millis();
-  lastGetAlertsMillis = millis();
-  lcd.setCursor(8, 0);
 
   Serial.print("Current status: ");
   Serial.println(newStatus);
@@ -216,24 +213,25 @@ void processAlert() {
     lcd.setBacklight(hours >= MIN_HOURS && hours < MAX_HOURS);
   } else if (newStatus == TOO_MANY_REQUEST) {
     Serial.println("[WARNING] TOO MANY REQUESTS");
-    lastGetAlertsMillis = +TOO_MANY_REQUESTS_PAUSE_MS;
+    lastGetAlertsMillis += TOO_MANY_REQUESTS_PAUSE_MS;
   } else {
     lcd.noBacklight();
   }
 
+  lcd.setCursor(8, 0);
   // Only in case of changes
   if (newStatus != LAST_STATUS) {
     switch (newStatus) {
       case ALERT_ON:
-      case PARTIAL_ALERT:
+      case REGION_ALERT:
+      case DISTRICT_ALERT:
       case NO_ALERT:
         if (newStatus != LAST_VALID_STATUS) {
           printStatusTime();
         }
         LAST_VALID_STATUS = newStatus;
         break;
-      default:
-        break;
+      default: break;
     }
     printStatus(newStatus);
     LAST_STATUS = newStatus;
@@ -270,8 +268,11 @@ void printStatus(Status status) {
     case ALERT_ON:
       strStatus = " - ALERT";
       break;
-    case PARTIAL_ALERT:
-      strStatus = " - Partial";
+    case REGION_ALERT:
+        strStatus = " - REG ALERT";
+        break;
+    case DISTRICT_ALERT:
+      strStatus = " - dist alert";
       break;
     case WIFI_FAILED:
       strStatus = " - ERR_WIFI";

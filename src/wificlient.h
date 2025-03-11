@@ -1,0 +1,2 @@
+void connectToWiFi();
+bool connectIfNotConnected();
