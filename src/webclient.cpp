@@ -22,15 +22,19 @@ HttpResponse sendGetRequest(const String& url,
   return {httpResponseCode, responseBody};
 }
 
-bool stringToJson(DynamicJsonDocument targetDoc, String sourceStr) {
-  DeserializationError parseError = deserializeJson(targetDoc, sourceStr);
-
-  // Check for errors
-  if (parseError) {
-    Serial.print("Failed to parse JSON: ");
-    Serial.println(parseError.c_str());
-    return false;
+bool stringToJson(DynamicJsonDocument& targetDoc, const String& sourceStr) {
+  DeserializationError error = deserializeJson(targetDoc, sourceStr);
+    
+  if (error) {
+      Serial.print("Failed to parse JSON: ");
+      Serial.println(error.c_str());
+      return false;
   }
 
+  /*JsonObject obj = targetDoc.as<JsonObject>();
+  Serial.println("Top-level keys in JSON:");
+  for (JsonPair kv : obj) {
+      Serial.println(kv.key().c_str());
+  } */
   return true;
 }
