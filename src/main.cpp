@@ -10,7 +10,9 @@
 
 #include <array>
 
-#include "datasend.h"
+#include "network/datasend.h"
+#include "network/alerts.h"
+#include "network/wificlient.h"
 #include "time.h"
 
 String getResetReason(RESET_REASON reason);
@@ -30,7 +32,7 @@ String getTimeString();
 const float kPaToMmHg = 1.33322;
 const int MAIN_LOOP_DELAY_MS = 20 * 1000;
 const int SEND_TO_SERVER_DELAY_MS = 3 * 60 * 1000;
-const int GET_ALERTS_DELAY_MS = 15 * 1000;
+const int GET_ALERTS_DELAY_MS = 10 * 1000;
 const int TOO_MANY_REQUESTS_PAUSE_MS = 2 * 60 * 1000;
 const int LCD_ROW_LENGTH = 20;
 unsigned long lastSendMillis = millis() - SEND_TO_SERVER_DELAY_MS;
@@ -98,13 +100,9 @@ void setup() {
   lcd.createChar(0, transferIndicator);
   printAndShow(2, "Please wait sys init");
 
-  // DS18B20
+  // Sensors
   initDS18B20();
-
-  // BME280
   initBME280();
-
-  // MHZ19B
   initMHZ19B();
 
   // Diagnostic
@@ -113,8 +111,8 @@ void setup() {
   connectToWiFi();
 
   preferences.begin(PREFS_NAMESPACE);
-  processDaylight();
   processCalibration();
+  processDaylight();
   preferences.end();
 
   lcd.noBacklight();
@@ -136,16 +134,13 @@ void loop() {
   printMeteoData("T0=" + String(ds18b20Temperature, 1) + LCD_DEGREES + "C",
                  "T1=" + String(bme280[0], 1) + LCD_DEGREES + "C",
                  "H=" + String(bme280[1], 1) + "%",
-                 "P=" + String(bme280[2] / 1.33322, 1) + "mm",
-                 "C=" + String(co2Concentration, 1) +  "ppm");
+                 "P=" + String(bme280[2] / 1.33322, 0) + "mm",
+                 "C=" + String(co2Concentration, 0) +  "ppm");
 
-  Serial.println(SHORT_DIAGNOSTIC +
-                 "; esp32 T=" + (temprature_sens_read() - 32) / 1.8);
+  Serial.println(SHORT_DIAGNOSTIC + "; esp32 T=" + (temprature_sens_read() - 32) / 1.8);
 
   if (millis() >= lastSendMillis + SEND_TO_SERVER_DELAY_MS) {
     DynamicJsonDocument jsonData(128);
-    //jsonData["temp_out"] = ds18b20Temperature;
-    //jsonData["co2"] = co2Concentration;
     jsonData["tempIn"] = ds18b20Temperature;
     jsonData["humidity"] = bme280[1];
     jsonData["pressure"] = bme280[2];
@@ -187,13 +182,20 @@ void processDaylight() {
   try {
     pinMode(PIN_DAYLIGHT_INVERT, INPUT);
     int readPinState = digitalRead(PIN_DAYLIGHT_INVERT);
+    Serial.print("Daylight pin state: ");
+    Serial.println(readPinState);
     bool currentDaylightState = preferences.getBool(PREF_DAYLIGHT, 0);
     Serial.print("Is daylight time: ");
     Serial.println(currentDaylightState);
-    if(readPinState== HIGH) {
+    if(readPinState == LOW) {
+      Serial.println("Inverting daylight time");
       currentDaylightState = !currentDaylightState;
       preferences.putBool(PREF_DAYLIGHT, currentDaylightState);
     }
+    Serial.println("ConfigTime params:");
+    Serial.println(GMT_OFFSET_SEC);
+    Serial.println(currentDaylightState * DAYLIGHT_OFFSET_SEC);
+    Serial.println(NTP_SERVER);
     configTime(GMT_OFFSET_SEC, currentDaylightState * DAYLIGHT_OFFSET_SEC, NTP_SERVER);
   } catch (...) {
     Serial.print("Can't set time");
@@ -202,7 +204,7 @@ void processDaylight() {
 
 void processAlert() {
   switchNetworkIndicator(true);
-  Status newStatus = getAlertsV2();
+  Status newStatus = getSimpleAlerts();
   lastGetAlertsMillis = millis();
 
   Serial.print("Current status: ");
@@ -287,6 +289,7 @@ void printStatus(Status status) {
       strStatus = " - relax";
       break;
     default:
+      strStatus = " - ???";
       break;
   }
   // chars for status = lcd length - time length - status length - transmitting
@@ -373,6 +376,9 @@ void printMeteoData(String t0, String t1, String h, String p, String c) {
   lcd.print(h);
 
   lcd.setCursor(0, 1);
+  while (c.length() != halfLineSize + 1) {
+    c += " ";
+  }
   lcd.print(c);
 }
 

@@ -1,43 +1,16 @@
 #include <ArduinoJson.h>
-#include <datasend.h>
 #include <HTTPClient.h>
-#include <wificlient.h>
+#include <network/alerts.h>
+#include <network/wificlient.h>
 
-#include "webclient.h"
+#include "network/webclient.h"
 
 // All sensitive data is here in format `#define WIFI_SSID "MyHomeWiFi"`
 #include <secrets.h>
 
-#define ALL_OK 0;
-
 const String TARGET_REGION_INDEX_STR = "22";
 const String TARGET_CITY_INDEX_STR = "6293";
 const String REGION_STR = "Харківська область";
-
-int sendMeteoData(DynamicJsonDocument jsonData) {
-  if (!connectIfNotConnected()) {
-    return -1;
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    String jsonString;
-    serializeJson(jsonData, jsonString);
-    HTTPClient http;
-    http.begin(DATA_URL);
-    http.addHeader("Content-Type", "application/json");
-    int httpResponseCode = http.POST(jsonString);
-    Serial.print("JSON sending HTTP code: ");
-    Serial.println(httpResponseCode);
-    Serial.print("Send meteo response: ");
-    Serial.println(http.getString());
-    http.end();
-    return httpResponseCode;
-  } else {
-    Serial.print("Failed to connect to WiFi. Status is: ");
-    Serial.println(WiFi.status());
-    return -1;
-  }
-}
 
 Status getAlertsV2() {
   if (!connectIfNotConnected()) {
@@ -49,7 +22,7 @@ Status getAlertsV2() {
                                       {"Authorization", bearerToken}};
 
   HttpResponse response = sendGetRequest(String(ALERTS_ACTIVE_URL), headers);
-  Serial.print("Alerts HTTP code: ");
+  Serial.print("Alerts v2 HTTP code: ");
   Serial.println(response.statusCode);
 
   if (response.statusCode == -1) {
@@ -102,8 +75,7 @@ Status getAlertsV2() {
         }
       }
     }
-  }
-  else {
+  } else {
     Serial.println("No 'alerts' item in response");
     return RESPONSE_FAILED;
   }
@@ -115,5 +87,39 @@ Status getAlertsV2() {
     return DISTRICT_ALERT;
   } else {
     return NO_ALERT;
+  }
+}
+
+Status getSimpleAlerts() {
+  if (!connectIfNotConnected()) {
+    return WIFI_FAILED;
+  }
+
+  HttpResponse response = sendGetRequest(String(ALERTS_CUSTOM), {});
+  Serial.print("Simple alerts HTTP code: ");
+  Serial.println(response.statusCode);
+
+  if (response.statusCode == -1) {
+    Serial.println(
+        "[WARNING] Network failed. No internet or alerts host is not "
+        "accessible.");
+    return CONNECTION_FAILED;
+  }
+
+  if (response.statusCode != 200) {
+    Serial.println("[WARNING] Not valid response status");
+    Serial.println(response.responseBody);
+    return RESPONSE_FAILED;
+  }
+  Serial.println(response.responseBody);
+
+  if(response.responseBody == "A") {
+    return ALERT_ON;
+  } else if (response.responseBody == "P") {
+    return DISTRICT_ALERT;
+  } else if (response.responseBody == "N") {
+    return NO_ALERT;
+  } else {
+    return RESPONSE_FAILED;
   }
 }

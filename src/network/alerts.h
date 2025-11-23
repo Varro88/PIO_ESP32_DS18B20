@@ -15,7 +15,5 @@ enum Status {
     RESPONSE_FAILED
 };
 
-void connectToWiFi();
-int sendMeteoData(DynamicJsonDocument jsonData);
-Status getAlerts();
 Status getAlertsV2();
+Status getSimpleAlerts();

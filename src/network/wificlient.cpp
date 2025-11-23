@@ -1,6 +1,6 @@
 #include <WiFi.h>
 #include <secrets.h>
-#include <wificlient.h>
+#include <network/wificlient.h>
 
 const int WIFI_CONNECT_TIMEOUT_MS = 30 * 1000;
 
