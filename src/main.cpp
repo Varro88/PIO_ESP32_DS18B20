@@ -1,16 +1,10 @@
-#include <Adafruit_BME280.h>
-#include <Adafruit_Sensor.h>
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 #include <rom/rtc.h>
-#include <sensors/BME280.h>
-#include <sensors/DS18B20.h>
-#include <sensors/MHZ19B.h>
 #include <Preferences.h>
 
 #include <array>
 
-#include "network/datasend.h"
 #include "network/alerts.h"
 #include "network/wificlient.h"
 #include "time.h"
@@ -19,7 +13,6 @@ String getResetReason(RESET_REASON reason);
 void processAlert();
 void processCalibration();
 void processDaylight();
-void printMeteoData(String t1, String t2, String h, String p, String c);
 void printStatusWithTime(int column, int row, String format);
 void printStatus(Status status);
 void printStatusTime();
@@ -28,16 +21,11 @@ void printAndShow(int row, String text);
 void switchNetworkIndicator(boolean isShown);
 String getTimeString();
 
-#define SEALEVELPRESSURE_HPA (1013.25)
-const float kPaToMmHg = 1.33322;
 const int MAIN_LOOP_DELAY_MS = 20 * 1000;
-const int SEND_TO_SERVER_DELAY_MS = 3 * 60 * 1000;
 const int GET_ALERTS_DELAY_MS = 10 * 1000;
 const int TOO_MANY_REQUESTS_PAUSE_MS = 2 * 60 * 1000;
 const int LCD_ROW_LENGTH = 20;
-unsigned long lastSendMillis = millis() - SEND_TO_SERVER_DELAY_MS;
 unsigned long lastGetAlertsMillis = millis() - GET_ALERTS_DELAY_MS;
-const String LCD_DEGREES = "\xDF";
 const String DATETIME_FORMAT = "%A, %B %d %Y %H:%M:%S";
 const char *TIME_FORMAT = "%H:%M";
 
@@ -49,9 +37,6 @@ const long GMT_OFFSET_SEC = 7200;
 const int DAYLIGHT_OFFSET_SEC = 3600;
 int PIN_DAYLIGHT_INVERT = 5;
 const char *PREF_DAYLIGHT = "IS_DAYLIGHT";
-
-const char *PREF_CALIB = "ALLOW_CALIB";
-int PIN_CALIBRATION_CO2 = 4;
 
 const int MIN_HOURS = 7;
 const int MAX_HOURS = 22;
@@ -100,54 +85,24 @@ void setup() {
   lcd.createChar(0, transferIndicator);
   printAndShow(2, "Please wait sys init");
 
-  // Sensors
-  initDS18B20();
-  initBME280();
-  initMHZ19B();
-
   // Diagnostic
   SHORT_DIAGNOSTIC = "Last reset: CPU0=" + getResetReason(rtc_get_reset_reason(0)) + " / CPU1=" + rtc_get_reset_reason(1);
 
   connectToWiFi();
 
   preferences.begin(PREFS_NAMESPACE);
-  processCalibration();
   processDaylight();
   preferences.end();
 
   lcd.noBacklight();
+  lcd.clear();
 }
 
 void loop() {
-  lcd.setCursor(15, 1);
+  lcd.setCursor(15, 2);
   lcd.print(getTimeString());
 
-  // DS18B20
-  float ds18b20Temperature = getDS18B20Value();
-
-  // BME280
-  std::array<float, 3> bme280 = getBME280Measurings();
-
-  // MHZ19B
-  float co2Concentration = getCO2Concentration();
-
-  printMeteoData("T0=" + String(ds18b20Temperature, 1) + LCD_DEGREES + "C",
-                 "T1=" + String(bme280[0], 1) + LCD_DEGREES + "C",
-                 "H=" + String(bme280[1], 1) + "%",
-                 "P=" + String(bme280[2] / 1.33322, 0) + "mm",
-                 "C=" + String(co2Concentration, 0) +  "ppm");
-
   Serial.println(SHORT_DIAGNOSTIC + "; esp32 T=" + (temprature_sens_read() - 32) / 1.8);
-
-  if (millis() >= lastSendMillis + SEND_TO_SERVER_DELAY_MS) {
-    DynamicJsonDocument jsonData(128);
-    jsonData["tempIn"] = ds18b20Temperature;
-    jsonData["humidity"] = bme280[1];
-    jsonData["pressure"] = bme280[2];
-    jsonData["co2"] = co2Concentration;
-    sendMeteoData(jsonData);
-    lastSendMillis = millis();
-  }
 
   if (millis() >= lastGetAlertsMillis + GET_ALERTS_DELAY_MS) {
     processAlert();
@@ -155,27 +110,6 @@ void loop() {
 
   Serial.println("=====");
   delay(MAIN_LOOP_DELAY_MS);
-}
-
-void processCalibration() {
-  preferences.putBool(PREF_CALIB, false);
-
-  bool calibrationAllowed = preferences.getBool(PREF_CALIB, false);
-  Serial.print("Is calibration allowed: ");
-  Serial.println(calibrationAllowed);
-  int calibrationPinState = digitalRead(PIN_CALIBRATION_CO2);
-  Serial.print("Calibration pin state: ");
-  Serial.println(calibrationPinState);
-  if(calibrationAllowed && calibrationPinState == HIGH) {
-    Serial.println("Entering CO2 calib");
-    preferences.putBool(PREF_CALIB, false);
-    printAndShow(2, "CO2 calib in 1 min  ");
-    delay(60*1000);
-    printAndShow(2, "CO2 CALIB STARTED   ");
-    calibrate();
-    preferences.putBool(PREF_CALIB, false);
-  }
-  //setAutocalibration(false);
 }
 
 void processDaylight() {
@@ -264,7 +198,7 @@ String getTimeString() {
 }
 
 void printStatus(Status status) {
-  lcd.setCursor(5, 0);
+  lcd.setCursor(5, 1);
   String strStatus = "";
   switch (status) {
     case ALERT_ON:
@@ -302,7 +236,7 @@ void printStatus(Status status) {
 }
 
 void printStatusTime() {
-  lcd.setCursor(0, 0);
+  lcd.setCursor(0, 1);
   String time = getTimeString();
   lcd.print(time);
 }
@@ -342,44 +276,6 @@ String getResetReason(RESET_REASON reason) {
     default:
       return "N/A";
   }
-}
-
-void printMeteoData(String t0, String t1, String h, String p, String c) {
-  int halfLineSize = 10;
-
-  Serial.println(t0);
-  lcd.setCursor(0, 2);
-  while (t0.length() < halfLineSize) {
-    t0 += " ";
-  }
-  lcd.print(t0);
-
-  Serial.println(t1);
-  lcd.setCursor(0, 3);
-  while (t1.length() != halfLineSize) {
-    t1 += " ";
-  }
-  lcd.print(t1);
-
-  Serial.println(p);
-  lcd.setCursor(10, 2);
-  while (p.length() != halfLineSize) {
-    p += " ";
-  }
-  lcd.print(p);
-
-  Serial.println(h);
-  lcd.setCursor(10, 3);
-  while (h.length() != halfLineSize) {
-    h += " ";
-  }
-  lcd.print(h);
-
-  lcd.setCursor(0, 1);
-  while (c.length() != halfLineSize + 1) {
-    c += " ";
-  }
-  lcd.print(c);
 }
 
 void printAndShow(int row, String text) {
