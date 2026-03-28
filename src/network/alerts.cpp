@@ -42,7 +42,7 @@ Status getAlertsV2() {
 
   if (!stringToJson(jsonHolder, response.responseBody)) {
     Serial.println("Failed to convert response to JSON");
-    return RESPONSE_FAILED;
+    return RESPONSE_BODY_FAILED;
   }
 
   JsonObject obj = jsonHolder.as<JsonObject>();
@@ -77,7 +77,7 @@ Status getAlertsV2() {
     }
   } else {
     Serial.println("No 'alerts' item in response");
-    return RESPONSE_FAILED;
+    return RESPONSE_BODY_FAILED;
   }
 
   if (regionAlert) {
@@ -109,7 +109,7 @@ Status getSimpleAlerts() {
   if (response.statusCode != 200) {
     Serial.println("[WARNING] Not valid response status");
     Serial.println(response.responseBody);
-    return RESPONSE_FAILED;
+    return RESPONSE_CODE_FAILED;
   }
   Serial.println(response.responseBody);
 
@@ -120,6 +120,6 @@ Status getSimpleAlerts() {
   } else if (response.responseBody == "N") {
     return NO_ALERT;
   } else {
-    return RESPONSE_FAILED;
+    return RESPONSE_BODY_FAILED;
   }
 }

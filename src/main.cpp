@@ -30,13 +30,13 @@ String getTimeString();
 
 #define SEALEVELPRESSURE_HPA (1013.25)
 const float kPaToMmHg = 1.33322;
-const int MAIN_LOOP_DELAY_MS = 20 * 1000;
-const int SEND_TO_SERVER_DELAY_MS = 3 * 60 * 1000;
+//const int MAIN_LOOP_DELAY_MS = 15 * 1000;
 const int GET_ALERTS_DELAY_MS = 10 * 1000;
+const int SEND_TO_SERVER_PERIOD_MS = 5 * 60 * 1000;
 const int TOO_MANY_REQUESTS_PAUSE_MS = 2 * 60 * 1000;
 const int LCD_ROW_LENGTH = 20;
-unsigned long lastSendMillis = millis() - SEND_TO_SERVER_DELAY_MS;
-unsigned long lastGetAlertsMillis = millis() - GET_ALERTS_DELAY_MS;
+unsigned long lastSendMs = 0;
+unsigned long lastGetAlertsMs = 0;
 const String LCD_DEGREES = "\xDF";
 const String DATETIME_FORMAT = "%A, %B %d %Y %H:%M:%S";
 const char *TIME_FORMAT = "%H:%M";
@@ -62,8 +62,8 @@ LiquidCrystal_I2C lcd(0x27, 20, 4);
 int counter = 0;
 String SHORT_DIAGNOSTIC = "";
 Status LAST_STATUS = INIT;
-String LAST_VALID_STATUS_TIME = "";
 Status LAST_VALID_STATUS = INIT;
+String LAST_VALID_STATUS_TIME = "";
 
 const uint8_t number[] = {
     0xFF, 0x00, 0xFF, 0xFF, 0x01, 0xFF,  // 0
@@ -139,22 +139,20 @@ void loop() {
 
   Serial.println(SHORT_DIAGNOSTIC + "; esp32 T=" + (temprature_sens_read() - 32) / 1.8);
 
-  if (millis() >= lastSendMillis + SEND_TO_SERVER_DELAY_MS) {
+  if (millis() >= lastSendMs + SEND_TO_SERVER_PERIOD_MS) {
     DynamicJsonDocument jsonData(128);
     jsonData["tempIn"] = ds18b20Temperature;
     jsonData["humidity"] = bme280[1];
     jsonData["pressure"] = bme280[2];
     jsonData["co2"] = co2Concentration;
     sendMeteoData(jsonData);
-    lastSendMillis = millis();
+    lastSendMs = millis();
   }
 
-  if (millis() >= lastGetAlertsMillis + GET_ALERTS_DELAY_MS) {
-    processAlert();
-  }
+  processAlert();
 
   Serial.println("=====");
-  delay(MAIN_LOOP_DELAY_MS);
+  delay(GET_ALERTS_DELAY_MS);
 }
 
 void processCalibration() {
@@ -205,7 +203,7 @@ void processDaylight() {
 void processAlert() {
   switchNetworkIndicator(true);
   Status newStatus = getSimpleAlerts();
-  lastGetAlertsMillis = millis();
+  lastGetAlertsMs = millis();
 
   Serial.print("Current status: ");
   Serial.println(newStatus);
@@ -215,7 +213,7 @@ void processAlert() {
     lcd.setBacklight(hours >= MIN_HOURS && hours < MAX_HOURS);
   } else if (newStatus == TOO_MANY_REQUEST) {
     Serial.println("[WARNING] TOO MANY REQUESTS");
-    lastGetAlertsMillis += TOO_MANY_REQUESTS_PAUSE_MS;
+    lastGetAlertsMs += TOO_MANY_REQUESTS_PAUSE_MS;
   } else {
     lcd.noBacklight();
   }
@@ -287,6 +285,12 @@ void printStatus(Status status) {
       break;
     case NO_ALERT:
       strStatus = " - relax";
+      break;
+    case RESPONSE_CODE_FAILED:
+      strStatus = " - ERR_RCODE";
+      break;
+    case RESPONSE_BODY_FAILED:
+      strStatus = " - ERR_RBODY";
       break;
     default:
       strStatus = " - ???";
