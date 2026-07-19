@@ -123,7 +123,8 @@ void loop() {
   lcd.print(getTimeString());
 
   // DS18B20
-  float ds18b20Temperature = getDS18B20Value();
+  float outerTemperature = getOuterDS18B20Value();
+  float innerTemperature = getInnerDS18B20Value();
 
   // BME280
   std::array<float, 3> bme280 = getBME280Measurings();
@@ -131,8 +132,8 @@ void loop() {
   // MHZ19B
   float co2Concentration = getCO2Concentration();
 
-  printMeteoData("T0=" + String(ds18b20Temperature, 1) + LCD_DEGREES + "C",
-                 "T1=" + String(bme280[0], 1) + LCD_DEGREES + "C",
+  printMeteoData("T0=" + String(outerTemperature, 1) + LCD_DEGREES + "C",
+                 "T1=" + String(innerTemperature, 1) + LCD_DEGREES + "C",
                  "H=" + String(bme280[1], 1) + "%",
                  "P=" + String(bme280[2] / 1.33322, 0) + "mm",
                  "C=" + String(co2Concentration, 0) +  "ppm");
@@ -141,7 +142,8 @@ void loop() {
 
   if (millis() >= lastSendMs + SEND_TO_SERVER_PERIOD_MS) {
     DynamicJsonDocument jsonData(128);
-    jsonData["tempIn"] = ds18b20Temperature;
+    jsonData["tempIn"] = innerTemperature;
+    jsonData["tempOut"] = outerTemperature;
     jsonData["humidity"] = bme280[1];
     jsonData["pressure"] = bme280[2];
     jsonData["co2"] = co2Concentration;

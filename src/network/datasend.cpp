@@ -10,6 +10,8 @@
 
 int sendMeteoData(DynamicJsonDocument jsonData) {
   if (!connectIfNotConnected()) {
+    Serial.print("Wi-Fi connection failed. Status is: ");
+    Serial.println(WiFi.status());
     return -1;
   }
 
@@ -27,7 +29,7 @@ int sendMeteoData(DynamicJsonDocument jsonData) {
     http.end();
     return httpResponseCode;
   } else {
-    Serial.print("Failed to connect to WiFi. Status is: ");
+    Serial.print("Not connected to WiFi. Status is: ");
     Serial.println(WiFi.status());
     return -1;
   }
