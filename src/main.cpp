@@ -22,10 +22,10 @@ void processDaylight();
 void printMeteoData(String t1, String t2, String h, String p, String c);
 void printStatusWithTime(int column, int row, String format);
 void printStatus(Status status);
-void printStatusTime();
-void printDiagnostic(int rowIndex);
+void printStatusTime(String time);
 void printAndShow(int row, String text);
 void switchNetworkIndicator(boolean isShown);
+void printAndShowAsLog(String text);
 String getTimeString();
 
 #define SEALEVELPRESSURE_HPA (1013.25)
@@ -43,6 +43,8 @@ const char *TIME_FORMAT = "%H:%M";
 
 Preferences preferences;
 const char *PREFS_NAMESPACE = "generalPrefs";
+
+String lcdLog[4] = {"", "", "", ""};
 
 const char *NTP_SERVER = "ua.pool.ntp.org";
 const long GMT_OFFSET_SEC = 7200;
@@ -98,7 +100,7 @@ void setup() {
   lcd.init();
   lcd.backlight();
   lcd.createChar(0, transferIndicator);
-  printAndShow(2, "Please wait sys init");
+  printAndShowAsLog("Please wait sys init");
 
   // Sensors
   initDS18B20();
@@ -119,7 +121,7 @@ void setup() {
 }
 
 void loop() {
-  lcd.setCursor(15, 1);
+  lcd.setCursor(0, 1);
   lcd.print(getTimeString());
 
   // DS18B20
@@ -161,17 +163,19 @@ void processCalibration() {
   preferences.putBool(PREF_CALIB, false);
 
   bool calibrationAllowed = preferences.getBool(PREF_CALIB, false);
-  Serial.print("Is calibration allowed: ");
-  Serial.println(calibrationAllowed);
+  printAndShowAsLog("Is calib allowed:");
+  printAndShowAsLog(String(calibrationAllowed));
   int calibrationPinState = digitalRead(PIN_CALIBRATION_CO2);
-  Serial.print("Calibration pin state: ");
-  Serial.println(calibrationPinState);
+  printAndShowAsLog("Calib pin state:");
+  printAndShowAsLog(String(calibrationPinState));
   if(calibrationAllowed && calibrationPinState == HIGH) {
-    Serial.println("Entering CO2 calib");
+    printAndShowAsLog("Entering CO2 calib");
     preferences.putBool(PREF_CALIB, false);
-    printAndShow(2, "CO2 calib in 1 min  ");
-    delay(60*1000);
-    printAndShow(2, "CO2 CALIB STARTED   ");
+    printAndShowAsLog("CO2 calib in 1 min");
+    delay(30*1000);
+    printAndShowAsLog("CO2 calib in 30 seconds");
+    delay(30*1000);
+    printAndShowAsLog("CO2 CALIB STARTED");
     calibrate();
     preferences.putBool(PREF_CALIB, false);
   }
@@ -182,23 +186,23 @@ void processDaylight() {
   try {
     pinMode(PIN_DAYLIGHT_INVERT, INPUT);
     int readPinState = digitalRead(PIN_DAYLIGHT_INVERT);
-    Serial.print("Daylight pin state: ");
-    Serial.println(readPinState);
+    printAndShowAsLog("Daylight pin state:");
+    printAndShowAsLog(String(readPinState));
     bool currentDaylightState = preferences.getBool(PREF_DAYLIGHT, 0);
-    Serial.print("Is daylight time: ");
-    Serial.println(currentDaylightState);
+    printAndShowAsLog("Is daylight time:");
+    printAndShowAsLog(String(currentDaylightState));
     if(readPinState == LOW) {
-      Serial.println("Inverting daylight time");
+      printAndShowAsLog("Inverting daylight time");
       currentDaylightState = !currentDaylightState;
       preferences.putBool(PREF_DAYLIGHT, currentDaylightState);
     }
-    Serial.println("ConfigTime params:");
-    Serial.println(GMT_OFFSET_SEC);
-    Serial.println(currentDaylightState * DAYLIGHT_OFFSET_SEC);
-    Serial.println(NTP_SERVER);
+    printAndShowAsLog("ConfigTime params:");
+    printAndShowAsLog(String(GMT_OFFSET_SEC));
+    printAndShowAsLog(String(currentDaylightState * DAYLIGHT_OFFSET_SEC));
+    printAndShowAsLog(String(NTP_SERVER));
     configTime(GMT_OFFSET_SEC, currentDaylightState * DAYLIGHT_OFFSET_SEC, NTP_SERVER);
   } catch (...) {
-    Serial.print("Can't set time");
+    printAndShowAsLog("Can't set time");
   }
 }
 
@@ -207,7 +211,7 @@ void processAlert() {
   Status newStatus = getSimpleAlerts();
   lastGetAlertsMs = millis();
 
-  Serial.print("Current status: ");
+  Serial.print("New status: ");
   Serial.println(newStatus);
 
   // special conditions
@@ -228,8 +232,11 @@ void processAlert() {
       case REGION_ALERT:
       case DISTRICT_ALERT:
       case NO_ALERT:
-        if (newStatus != LAST_VALID_STATUS) {
-          printStatusTime();
+        if (newStatus != LAST_VALID_STATUS && LAST_VALID_STATUS != INIT) {
+          printStatusTime(getTimeString());
+        }
+        else {
+          printStatusTime("--:--");
         }
         LAST_VALID_STATUS = newStatus;
         break;
@@ -307,9 +314,8 @@ void printStatus(Status status) {
   lcd.print(strStatus);
 }
 
-void printStatusTime() {
+void printStatusTime(String time) {
   lcd.setCursor(0, 0);
-  String time = getTimeString();
   lcd.print(time);
 }
 
@@ -381,10 +387,7 @@ void printMeteoData(String t0, String t1, String h, String p, String c) {
   }
   lcd.print(h);
 
-  lcd.setCursor(0, 1);
-  while (c.length() != halfLineSize + 1) {
-    c += " ";
-  }
+  lcd.setCursor(10, 1);
   lcd.print(c);
 }
 
@@ -392,4 +395,22 @@ void printAndShow(int row, String text) {
   Serial.println(text);
   lcd.setCursor(0, row);
   lcd.print(text);
+}
+
+void printAndShowAsLog(String text) {
+  Serial.println(text);
+
+  lcdLog[0] = lcdLog[1];
+  lcdLog[1] = lcdLog[2];
+  lcdLog[2] = lcdLog[3];
+  lcdLog[3] = text;
+
+  for (int i = 0; i < 4; i++) {
+    lcd.setCursor(0, i);
+    lcd.print(lcdLog[i]);
+    while (lcdLog[i].length() < LCD_ROW_LENGTH) {
+      lcdLog[i] += " ";
+    }
+    delay(400);
+  }
 }
