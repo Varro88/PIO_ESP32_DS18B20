@@ -21,11 +21,10 @@ void printAndShow(int row, String text);
 void switchNetworkIndicator(boolean isShown);
 String getTimeString();
 
-const int MAIN_LOOP_DELAY_MS = 20 * 1000;
-const int GET_ALERTS_DELAY_MS = 10 * 1000;
+const int MAIN_LOOP_DELAY_MS = 10 * 1000;
 const int TOO_MANY_REQUESTS_PAUSE_MS = 2 * 60 * 1000;
 const int LCD_ROW_LENGTH = 20;
-unsigned long lastGetAlertsMillis = millis() - GET_ALERTS_DELAY_MS;
+unsigned long lastGetAlertsMillis = millis() - MAIN_LOOP_DELAY_MS;
 const String DATETIME_FORMAT = "%A, %B %d %Y %H:%M:%S";
 const char *TIME_FORMAT = "%H:%M";
 
@@ -104,9 +103,7 @@ void loop() {
 
   Serial.println(SHORT_DIAGNOSTIC + "; esp32 T=" + (temprature_sens_read() - 32) / 1.8);
 
-  if (millis() >= lastGetAlertsMillis + GET_ALERTS_DELAY_MS) {
-    processAlert();
-  }
+  processAlert();
 
   Serial.println("=====");
   delay(MAIN_LOOP_DELAY_MS);
