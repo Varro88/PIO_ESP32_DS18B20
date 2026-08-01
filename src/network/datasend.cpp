@@ -18,6 +18,8 @@ int sendMeteoData(DynamicJsonDocument jsonData) {
   if (WiFi.status() == WL_CONNECTED) {
     String jsonString;
     serializeJson(jsonData, jsonString);
+    Serial.print("Send meteo request: ");
+    Serial.println(jsonString);
     HTTPClient http;
     http.begin(DATA_URL);
     http.addHeader("Content-Type", "application/json");
