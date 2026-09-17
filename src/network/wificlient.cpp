@@ -42,5 +42,11 @@ bool connectIfNotConnected() {
     Serial.println(WiFi.status());
     return false;
   }
+
+  int rssi = WiFi.RSSI();
+  Serial.print("Signal Strength (RSSI): ");
+  Serial.print(rssi);
+  Serial.println(" dBm");
+
   return true;
 }

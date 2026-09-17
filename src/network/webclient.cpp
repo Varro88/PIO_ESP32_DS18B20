@@ -5,6 +5,7 @@ HttpResponse sendGetRequest(const String& url,
                             const std::map<String, String>& headers) {
   HTTPClient http;
   http.begin(url);
+  http.setTimeout(7000);
 
   for (const auto& header : headers) {
     http.addHeader(header.first, header.second);
