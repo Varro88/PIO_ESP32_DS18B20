@@ -100,14 +100,12 @@ AlertData getSimpleAlerts() {
   Serial.println(response.statusCode);
 
   if (response.statusCode == -1) {
-    Serial.println(
-        "[WARNING] Network failed. No internet or alerts host is not "
-        "accessible.");
+    Serial.println("[WARNING] Network failed. No internet or alerts host is not accessible.");
     return {-1, CONNECTION_FAILED};
   }
 
   if (response.statusCode != 200) {
-    Serial.println("[WARNING] Not valid response status");
+    Serial.print("[WARNING] Status above was not valid. Body: ");
     Serial.println(response.responseBody);
     Status status;
     switch(response.statusCode) {

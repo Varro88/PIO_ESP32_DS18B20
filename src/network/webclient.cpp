@@ -1,8 +1,7 @@
 #include "network/webclient.h"
 #include <ArduinoJson.h>
 
-HttpResponse sendGetRequest(const String& url,
-                            const std::map<String, String>& headers) {
+HttpResponse sendGetRequest(const String& url, const std::map<String, String>& headers) {
   HTTPClient http;
   http.begin(url);
   http.setTimeout(7000);

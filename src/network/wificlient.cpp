@@ -48,5 +48,7 @@ bool connectIfNotConnected() {
   Serial.print(rssi);
   Serial.println(" dBm");
 
+  Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
+
   return true;
 }
