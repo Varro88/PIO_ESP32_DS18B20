@@ -19,10 +19,18 @@ enum Status {
     ERR_403,
     ERR_404,
     ERR_409,
+    ERR_429,
     ERR_502,
     ERR_503,
+    ERR_504,
     RESPONSE_BODY_FAILED
 };
 
+struct AlertData {
+    int responseCode;
+    Status status;
+};
+
+
 Status getAlertsV2();
-Status getSimpleAlerts();
+AlertData getSimpleAlerts();

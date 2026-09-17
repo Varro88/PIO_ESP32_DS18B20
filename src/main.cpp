@@ -21,7 +21,7 @@ void processCalibration();
 void processDaylight();
 void printMeteoData(String t1, String t2, String h, String p, String c);
 void printStatusWithTime(int column, int row, String format);
-void printStatus(Status status);
+void printStatus(AlertData status);
 void printStatusTime(String time);
 void printAndShow(int row, String text);
 void switchNetworkIndicator(boolean isShown);
@@ -208,7 +208,8 @@ void processDaylight() {
 
 void processAlert() {
   switchNetworkIndicator(true);
-  Status newStatus = getSimpleAlerts();
+  AlertData alertData = getSimpleAlerts();
+  Status newStatus = alertData.status;
   lastGetAlertsMs = millis();
 
   Serial.print("New status: ");
@@ -239,10 +240,13 @@ void processAlert() {
           printStatusTime("--:--");
         }
         LAST_VALID_STATUS = newStatus;
+        printStatus(alertData);
         break;
-      default: break;
+      default: String respCode = String(alertData.responseCode); 
+        printStatus(alertData);
+        break;
     }
-    printStatus(newStatus);
+    
     LAST_STATUS = newStatus;
   }
   switchNetworkIndicator(false);
@@ -270,10 +274,10 @@ String getTimeString() {
   }
 }
 
-void printStatus(Status status) {
+void printStatus(AlertData alertData) {
   lcd.setCursor(5, 0);
   String strStatus = "";
-  switch (status) {
+  switch (alertData.status) {
     case ALERT_ON:
       strStatus = " - ALERT";
       break;
@@ -295,17 +299,17 @@ void printStatus(Status status) {
     case NO_ALERT:
       strStatus = " - relax";
       break;
+    case ERR_400: strStatus = " - ERR_400"; break;
+    case ERR_401: strStatus = " - ERR_401"; break;
+    case ERR_402: strStatus = " - ERR_402"; break;
+    case ERR_403: strStatus = " - ERR_403"; break;
+    case ERR_404: strStatus = " - ERR_404"; break;
+    case ERR_409: strStatus = " - ERR_409"; break;
+    case ERR_502: strStatus = " - ERR_502"; break;
+    case ERR_503: strStatus = " - ERR_503"; break;
     case RESPONSE_CODE_FAILED:
-      strStatus = " - ERR_RCODE";
+      strStatus = String(alertData.responseCode);
       break;
-    case ERR_400: strStatus = "ERR_400"; break;
-    case ERR_401: strStatus = "ERR_401"; break;
-    case ERR_402: strStatus = "ERR_402"; break;
-    case ERR_403: strStatus = "ERR_403"; break;
-    case ERR_404: strStatus = "ERR_404"; break;
-    case ERR_409: strStatus = "ERR_409"; break;
-    case ERR_502: strStatus = "ERR_502"; break;
-    case ERR_503: strStatus = "ERR_503"; break;
     case RESPONSE_BODY_FAILED:
       strStatus = " - ERR_RBODY";
       break;

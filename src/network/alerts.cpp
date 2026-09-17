@@ -90,9 +90,9 @@ Status getAlertsV2() {
   }
 }
 
-Status getSimpleAlerts() {
+AlertData getSimpleAlerts() {
   if (!connectIfNotConnected()) {
-    return WIFI_FAILED;
+    return {-1, Status::WIFI_FAILED};
   }
 
   HttpResponse response = sendGetRequest(String(ALERTS_CUSTOM), {});
@@ -103,33 +103,37 @@ Status getSimpleAlerts() {
     Serial.println(
         "[WARNING] Network failed. No internet or alerts host is not "
         "accessible.");
-    return CONNECTION_FAILED;
+    return {-1, CONNECTION_FAILED};
   }
 
   if (response.statusCode != 200) {
     Serial.println("[WARNING] Not valid response status");
     Serial.println(response.responseBody);
+    Status status;
     switch(response.statusCode) {
-      case 400: return ERR_400;
-      case 401: return ERR_400;
-      case 402: return ERR_400;
-      case 403: return ERR_400;
-      case 404: return ERR_400;
-      case 409: return ERR_400;
-      case 502: return ERR_400;
-      case 503: return ERR_400;
-      default: return RESPONSE_CODE_FAILED;
+      case 400: status = ERR_400;
+      case 401: status = ERR_401;
+      case 402: status = ERR_402;
+      case 403: status = ERR_403;
+      case 404: status = ERR_404;
+      case 409: status = ERR_409;
+      case 429: status = ERR_429;
+      case 502: status = ERR_502;
+      case 503: status = ERR_503;
+      case 504: status = ERR_504;
+      default: status = RESPONSE_CODE_FAILED;
     }
+    return {response.statusCode, status};
   }
   Serial.println(response.responseBody);
 
   if(response.responseBody == "A") {
-    return ALERT_ON;
+    return {200, ALERT_ON};
   } else if (response.responseBody == "P") {
-    return DISTRICT_ALERT;
+    return {200, DISTRICT_ALERT};
   } else if (response.responseBody == "N") {
-    return NO_ALERT;
+    return {200, NO_ALERT};
   } else {
-    return RESPONSE_BODY_FAILED;
+    return {200, RESPONSE_BODY_FAILED};
   }
 }
