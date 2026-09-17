@@ -109,7 +109,17 @@ Status getSimpleAlerts() {
   if (response.statusCode != 200) {
     Serial.println("[WARNING] Not valid response status");
     Serial.println(response.responseBody);
-    return RESPONSE_CODE_FAILED;
+    switch(response.statusCode) {
+      case 400: return ERR_400;
+      case 401: return ERR_400;
+      case 402: return ERR_400;
+      case 403: return ERR_400;
+      case 404: return ERR_400;
+      case 409: return ERR_400;
+      case 502: return ERR_400;
+      case 503: return ERR_400;
+      default: return RESPONSE_CODE_FAILED;
+    }
   }
   Serial.println(response.responseBody);
 

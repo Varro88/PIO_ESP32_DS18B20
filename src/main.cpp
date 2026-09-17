@@ -298,6 +298,14 @@ void printStatus(Status status) {
     case RESPONSE_CODE_FAILED:
       strStatus = " - ERR_RCODE";
       break;
+    case ERR_400: strStatus = "ERR_400"; break;
+    case ERR_401: strStatus = "ERR_401"; break;
+    case ERR_402: strStatus = "ERR_402"; break;
+    case ERR_403: strStatus = "ERR_403"; break;
+    case ERR_404: strStatus = "ERR_404"; break;
+    case ERR_409: strStatus = "ERR_409"; break;
+    case ERR_502: strStatus = "ERR_502"; break;
+    case ERR_503: strStatus = "ERR_503"; break;
     case RESPONSE_BODY_FAILED:
       strStatus = " - ERR_RBODY";
       break;
