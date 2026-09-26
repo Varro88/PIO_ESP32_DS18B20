@@ -18,13 +18,9 @@ void sendMeteoData(DynamicJsonDocument jsonData) {
     String jsonString;
     serializeJson(jsonData, jsonString);
     logInfo((String)"Send meteo request: " + jsonString);
-    HTTPClient http;
-    http.begin(DATA_URL);
-    http.addHeader("Content-Type", "application/json");
-    int httpResponseCode = http.POST(jsonString);
-    logInfo((String)"JSON sending HTTP code: " + httpResponseCode);
-    logInfo((String)"Send meteo response: " + http.getString());
-    http.end();
+    std::map<String, String> headers;
+    headers["Content-Type"] = "application/json";
+    sendPostRequest(DATA_URL, headers, jsonString);
   } else {
     logWarn((String)"Not connected to WiFi. Status is: " + WiFi.status());
   }

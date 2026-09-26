@@ -22,7 +22,8 @@
   return {httpResponseCode, responseBody};
 }*/
 HTTPClient http;
-
+const int CONNECT_TIMEOUT = 3000;
+const int TIMEOUT = 7000;
 
 HttpResponse sendGetRequest(const String& url, const std::map<String, String>& headers) {
   static unsigned long requestId = 0;
@@ -42,7 +43,8 @@ HttpResponse sendGetRequest(const String& url, const std::map<String, String>& h
     return {-1, ""};
   }
 
-  http.setTimeout(7000);
+  http.setTimeout(CONNECT_TIMEOUT);
+  http.setTimeout(TIMEOUT);
 
   for (const auto& header : headers) {
     http.addHeader(header.first, header.second);
@@ -72,18 +74,31 @@ HttpResponse sendGetRequest(const String& url, const std::map<String, String>& h
 }
 
 HttpResponse sendPostRequest(const String& url, const std::map<String, String>& headers, const String& body) {
-    http.begin(DATA_URL);
-    http.addHeader("Content-Type", "application/json");
-    for (const auto& header : headers) {
-      http.addHeader(header.first, header.second);
+    if (!http.begin(url)) {
+        logInfo("POST failed: invalid URL: " + url);
+        return {-1, "Invalid URL"};
     }
-    int httpResponseCode = http.POST(jsonString);
-    logInfo((String)"JSON sending HTTP code: " + httpResponseCode);
-    logInfo((String)"Send meteo response: " + http.getString());
+    http.setTimeout(CONNECT_TIMEOUT);
+    http.setConnectTimeout(TIMEOUT);
+
+    for (const auto& header : headers) {
+        http.addHeader(header.first, header.second);
+    }
+
+    int httpResponseCode = http.POST(body);
+    String responseBody;
+
+    if (httpResponseCode > 0) {
+        responseBody = http.getString();
+        logInfo("POST response code: " + String(httpResponseCode));
+        logInfo("POST response body: " + responseBody);
+    } else {
+        logInfo("POST request failed, error: " + http.errorToString(httpResponseCode));
+    }
+
     http.end();
+    return {httpResponseCode, responseBody};
 }
-
-
 
 bool stringToJson(DynamicJsonDocument& targetDoc, const String& sourceStr) {
   DeserializationError error = deserializeJson(targetDoc, sourceStr);
