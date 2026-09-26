@@ -4,35 +4,28 @@
 #include <network/wificlient.h>
 
 #include "network/webclient.h"
+#include "../logger.h"
 
 // All sensitive data is here in format `#define WIFI_SSID "MyHomeWiFi"`
 #include <secrets.h>
 
-int sendMeteoData(DynamicJsonDocument jsonData) {
+void sendMeteoData(DynamicJsonDocument jsonData) {
   if (!connectIfNotConnected()) {
-    Serial.print("Wi-Fi connection failed. Status is: ");
-    Serial.println(WiFi.status());
-    return -1;
+    logError((String)"Wi-Fi connection failed. Status is: " + WiFi.status());
   }
 
   if (WiFi.status() == WL_CONNECTED) {
     String jsonString;
     serializeJson(jsonData, jsonString);
-    Serial.print("Send meteo request: ");
-    Serial.println(jsonString);
+    logInfo((String)"Send meteo request: " + jsonString);
     HTTPClient http;
     http.begin(DATA_URL);
     http.addHeader("Content-Type", "application/json");
     int httpResponseCode = http.POST(jsonString);
-    Serial.print("JSON sending HTTP code: ");
-    Serial.println(httpResponseCode);
-    Serial.print("Send meteo response: ");
-    Serial.println(http.getString());
+    logInfo((String)"JSON sending HTTP code: " + httpResponseCode);
+    logInfo((String)"Send meteo response: " + http.getString());
     http.end();
-    return httpResponseCode;
   } else {
-    Serial.print("Not connected to WiFi. Status is: ");
-    Serial.println(WiFi.status());
-    return -1;
+    logWarn((String)"Not connected to WiFi. Status is: " + WiFi.status());
   }
 }

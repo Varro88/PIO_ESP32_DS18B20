@@ -13,6 +13,7 @@
 #include "network/datasend.h"
 #include "network/alerts.h"
 #include "network/wificlient.h"
+#include "logger.h"
 #include "time.h"
 
 String getResetReason(RESET_REASON reason);
@@ -118,6 +119,8 @@ void setup() {
   preferences.end();
 
   lcd.noBacklight();
+
+  //testHttpRequests(10000);
 }
 
 void loop() {
@@ -140,7 +143,7 @@ void loop() {
                  "P=" + String(bme280[2] / 1.33322, 0) + "mm",
                  "C=" + String(co2Concentration, 0) +  "ppm");
 
-  Serial.println(SHORT_DIAGNOSTIC + "; esp32 T=" + (temprature_sens_read() - 32) / 1.8);
+  logInfo((String)SHORT_DIAGNOSTIC + "; esp32 T=" + (temprature_sens_read() - 32) / 1.8);
 
   if(lastSendMs == 0 ||millis() >= lastSendMs + SEND_TO_SERVER_PERIOD_MS) {
     DynamicJsonDocument jsonData(128);
@@ -155,7 +158,7 @@ void loop() {
 
   processAlert();
 
-  Serial.println("=====");
+  logInfo("=====");
   delay(GET_ALERTS_DELAY_MS);
 }
 
@@ -212,14 +215,14 @@ void processAlert() {
   Status newStatus = alertData.status;
   lastGetAlertsMs = millis();
 
-  Serial.print("New status: ");
-  Serial.println(newStatus);
+  logInfo("New status: ");
+  logInfo(String(newStatus));
 
   // special conditions
   if (newStatus == ALERT_ON) {
     lcd.setBacklight(hours >= MIN_HOURS && hours < MAX_HOURS);
   } else if (newStatus == TOO_MANY_REQUEST) {
-    Serial.println("[WARNING] TOO MANY REQUESTS");
+    logInfo("[WARNING] TOO MANY REQUESTS");
     lastGetAlertsMs += TOO_MANY_REQUESTS_PAUSE_MS;
   } else {
     lcd.noBacklight();
@@ -355,28 +358,28 @@ String getResetReason(RESET_REASON reason) {
 void printMeteoData(String t0, String t1, String h, String p, String c) {
   int halfLineSize = 10;
 
-  Serial.println(t0);
+  logInfo(t0);
   lcd.setCursor(0, 2);
   while (t0.length() < halfLineSize) {
     t0 += " ";
   }
   lcd.print(t0);
 
-  Serial.println(t1);
+  logInfo(t1);
   lcd.setCursor(0, 3);
   while (t1.length() != halfLineSize) {
     t1 += " ";
   }
   lcd.print(t1);
 
-  Serial.println(p);
+  logInfo(p);
   lcd.setCursor(10, 2);
   while (p.length() != halfLineSize) {
     p += " ";
   }
   lcd.print(p);
 
-  Serial.println(h);
+  logInfo(h);
   lcd.setCursor(10, 3);
   while (h.length() != halfLineSize) {
     h += " ";
@@ -391,13 +394,13 @@ void printMeteoData(String t0, String t1, String h, String p, String c) {
 }
 
 void printAndShow(int row, String text) {
-  Serial.println(text);
+  logInfo(text);
   lcd.setCursor(0, row);
   lcd.print(text);
 }
 
 void printAndShowAsLog(String text) {
-  Serial.println(text);
+  logInfo(text);
 
   lcdLog[0] = lcdLog[1];
   lcdLog[1] = lcdLog[2];

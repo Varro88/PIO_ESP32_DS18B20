@@ -2,6 +2,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <Wire.h>
+#include "../logger.h"
 
 #define DS18B20_COUNT 2
 
@@ -28,7 +29,7 @@ void initDS18B20() {
 
 float getDS18B20Value(uint8_t index) {
     if (index >= DS18B20_COUNT) {
-        Serial.println("DS18B20 invalid sensor index");
+        logWarn("DS18B20 invalid sensor index");
         return NAN;
     }
 
@@ -36,7 +37,7 @@ float getDS18B20Value(uint8_t index) {
     float temperature = ds18B20Sensors[index].getTempCByIndex(0);
 
     if (temperature < -50) {
-        Serial.printf("DS18B20 sensor %d (pin %d) error\n", index, ds18b20Pins[index]);
+        logWarn((String)"DS18B20 sensor " + index +" (pin " + ds18b20Pins[index] + ") error");
         return NAN;
     }
 

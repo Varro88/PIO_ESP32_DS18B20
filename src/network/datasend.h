@@ -3,4 +3,4 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 
-int sendMeteoData(DynamicJsonDocument jsonData);
+void sendMeteoData(DynamicJsonDocument jsonData);

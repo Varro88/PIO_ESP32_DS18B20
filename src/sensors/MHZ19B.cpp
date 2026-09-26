@@ -1,6 +1,7 @@
 #include <HardwareSerial.h>
 #include <Wire.h>
 #include <sensors/MHZ19B.h>
+#include "../logger.h"
 
 #define TX_PIN 17 // ESP32 TX pin
 #define RX_PIN 16 // ESP32 RX pin
@@ -49,7 +50,7 @@ float getCO2Concentration() {
     strResp += hexByte;
 
     if (i+1 == sizeof(response)) {
-      Serial.println("More than max allowable bytes in response, skipping next bytes");
+      logWarn("More than max allowable bytes in response, skipping next bytes");
       break;
     }
     i++;
@@ -57,22 +58,17 @@ float getCO2Concentration() {
   mySerial.flush();
 
   int temp = response[4] - 40;
-  Serial.print("Temperature: ");
-  Serial.println(temp);
-
-  Serial.print("Response CO2 from MH-Z19H: ");
-  Serial.println(strResp);
-
-  Serial.print("Response size: ");
-  Serial.println(i);
+  logInfo((String)"Temperature: " + temp);
+  logInfo((String)"Response CO2 from MH-Z19H: " + strResp);
+  logInfo((String)"Response size: " + i);
 
   if (i < 9) {
-    Serial.println("Error: Incomplete response from sensor");
+    logError("Incomplete response from sensor");
     return NAN;
   }
 
   if (response[0] == 0 && response[1] == 0) {
-    Serial.println("Error: zeroes in response from sensor");
+    logError("Error: zeroes in response from sensor");
     return NAN;
   }
 
@@ -80,12 +76,10 @@ float getCO2Concentration() {
     int high = response[2];
     int low = response[3];
     int ppm = (high << 8) + low;
-    Serial.print("CO2 Concentration: ");
-    Serial.print(ppm);
-    Serial.println(" ppm");
+    logInfo((String)"CO2 Concentration: " + ppm + " ppm");
     return (float)ppm;
   } else {
-    Serial.println("Error: Checksum validation failed");
+    logWarn("Error: Checksum validation failed");
   }
   return NAN;
 }
@@ -96,11 +90,5 @@ bool checkResponse(uint8_t * response) {
     checksum += response[i];
   }
   checksum = 0xFF - checksum + 1;
-  Serial.print("Checksum response: ");
-  Serial.println(response[8]);
-
-  Serial.print("Checksum calculated: ");
-  Serial.println(checksum);
-
   return checksum == response[8];
 }

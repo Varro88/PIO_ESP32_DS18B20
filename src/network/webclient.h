@@ -13,6 +13,8 @@ struct HttpResponse {
 
 // Function prototypes
 HttpResponse sendGetRequest(const String& url, const std::map<String, String>& headers);
+HttpResponse sendPostRequest(const String& url, const std::map<String, String>& headers, const String& body);
 bool stringToJson(DynamicJsonDocument& targetDoc, const String& sourceStr);
+
 
 #endif // HTTP_CLIENT_WRAPPER_H

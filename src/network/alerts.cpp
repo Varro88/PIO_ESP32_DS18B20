@@ -1,7 +1,8 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
-#include <network/alerts.h>
-#include <network/wificlient.h>
+#include "network/alerts.h"
+#include "network/wificlient.h"
+#include "../logger.h"
 
 #include "network/webclient.h"
 
@@ -12,82 +13,178 @@ const String TARGET_REGION_INDEX_STR = "22";
 const String TARGET_CITY_INDEX_STR = "6293";
 const String REGION_STR = "Харківська область";
 
-Status getAlertsV2() {
-  if (!connectIfNotConnected()) {
-    return WIFI_FAILED;
-  }
-  String bearerToken = "Bearer " ALERTS_TOKEN;
+void testHttpRequests(unsigned long intervalMs = 10000) {
+  const String url = "http://85.209.51.185:42042/alertStatus";
+  const int requestCount = 100;
 
-  std::map<String, String> headers = {{"Host", "api.alerts.in.ua"},
-                                      {"Authorization", bearerToken}};
+  int successCount = 0;
+  int failureCount = 0;
 
-  HttpResponse response = sendGetRequest(String(ALERTS_ACTIVE_URL), headers);
-  Serial.print("Alerts v2 HTTP code: ");
-  Serial.println(response.statusCode);
+  unsigned long lastRequestEnd = 0;
 
-  if (response.statusCode == -1) {
-    Serial.println("[WARNING] Network failed. No internet or alerts host is not accessible.");
-    return CONNECTION_FAILED;
-  }
+  HTTPClient http;
 
-  if (response.statusCode == 429) {
-    Serial.println("[WARNING] TOO MANY REQUESTS");
-    Serial.println(response.responseBody);
-    return TOO_MANY_REQUEST;
-  }
+  Serial.println();
+  Serial.println("========================================");
+  Serial.printf("Starting HTTP test: %d requests\n", requestCount);
+  Serial.printf("Interval: %lu ms\n", intervalMs);
+  Serial.println("HTTPClient: SINGLE INSTANCE, REUSED");
+  Serial.println("========================================");
 
-  Serial.print("Alerts response length: ");
-  Serial.println(response.responseBody.length());
-  DynamicJsonDocument jsonHolder(response.responseBody.length());
-
-  if (!stringToJson(jsonHolder, response.responseBody)) {
-    Serial.println("Failed to convert response to JSON");
-    return RESPONSE_BODY_FAILED;
+  // Initialize HTTPClient once.
+  if (!http.begin(url)) {
+    logDebug("[TEST] http.begin() FAILED");
+    return;
   }
 
-  JsonObject obj = jsonHolder.as<JsonObject>();
+  http.setTimeout(7000);
 
-  bool regionAlert = false;
-  bool districtAlert = false;
-  if (obj.containsKey("alerts")) {
-    JsonArray alerts = obj["alerts"].as<JsonArray>();
+  const unsigned long testStart = millis();
 
-    Serial.println("\nLocation UIDs in alerts:");
-    for (JsonObject alert : alerts) {
-      if (alert.containsKey("location_uid")) {
-        String locId = alert["location_uid"].as<String>();
-        Serial.print("Location id: ");
-        Serial.println(locId);
+  for (int i = 1; i <= requestCount; i++) {
+    Serial.printf("\n----- Request %d/%d -----\n", i, requestCount);
 
-        if (locId == TARGET_CITY_INDEX_STR) {
-          Serial.println("CITY_ALERT");
-          return ALERT_ON;
-        } else if (locId == TARGET_REGION_INDEX_STR) {
-          Serial.println("REGION_ALERT");
-          regionAlert = true;
-          continue;
-        } else {
-          const char* location_oblast = alert["location_oblast"];
-          if (location_oblast && String(location_oblast) == REGION_STR) {
-            Serial.println("District in region alert");
-            districtAlert = true;
-          }
-        }
-      }
+    const unsigned long now = millis();
+
+    if (lastRequestEnd != 0) {
+      Serial.printf(
+        "[TEST] Time since previous request: %lu ms\n",
+        now - lastRequestEnd
+      );
     }
-  } else {
-    Serial.println("No 'alerts' item in response");
-    return RESPONSE_BODY_FAILED;
+
+    const unsigned long start = millis();
+
+    int httpResponseCode = http.GET();
+
+    const unsigned long elapsed = millis() - start;
+
+    // Record the exact moment this request finished.
+    lastRequestEnd = millis();
+
+    if (httpResponseCode > 0) {
+      successCount++;
+
+      String responseBody = http.getString();
+
+      logCustom(
+        "[TEST] ",
+        (String)"#" + i +
+        " SUCCESS: HTTP " + httpResponseCode +
+        ", " + elapsed + " ms" +
+        ", body length " + responseBody.length()
+      );
+    } else {
+      failureCount++;
+
+      String error = http.errorToString(httpResponseCode);
+
+      logCustom(
+        "[TEST] ",
+        (String)"#" + i +
+        " FAILURE: code " + httpResponseCode +
+        ", error: " + error +
+        ", " + elapsed + " ms"
+      );
+
+      // Additional diagnostics only when a request fails.
+      Serial.printf(
+        "[TEST] WiFi status: %d, RSSI: %d dBm, free heap: %u\n",
+        WiFi.status(),
+        WiFi.RSSI(),
+        ESP.getFreeHeap()
+      );
+    }
+
+    // Don't wait after the last request.
+    if (i < requestCount) {
+      delay(intervalMs);
+    }
   }
 
-  if (regionAlert) {
-    return REGION_ALERT;
+  // Clean up only once, after all requests are complete.
+  http.end();
+
+  const unsigned long totalTime = millis() - testStart;
+
+  logDebug("========================================");
+  logDebug("HTTP test complete");
+  logDebug((String)"Successful: " + successCount);
+  logDebug((String)"Failed:     " + failureCount);
+  logDebug((String)"Total:      " + requestCount);
+  logDebug((String)"Total time: " + totalTime + " ms");
+  logDebug("========================================");
+}
+
+
+void testHttpRequestsPersistent() {
+  const String url = "http://85.209.51.185:42042/alertStatus";
+
+  int successCount = 0;
+  int failureCount = 0;
+
+  logDebug("========================================");
+  logDebug("Starting HTTP stress test: 500 requests");
+  logDebug("HTTPClient: REUSED");
+  logDebug("");
+
+  HTTPClient http;
+
+  if (!http.begin(url)) {
+    logDebug("[TEST] http.begin() FAILED");
+    return;
   }
-  if (districtAlert) {
-    return DISTRICT_ALERT;
-  } else {
-    return NO_ALERT;
+
+  http.setTimeout(7000);
+
+  const unsigned long testStart = millis();
+
+  for (int i = 1; i <= 500; i++) {
+    const unsigned long start = millis();
+
+    int statusCode = http.GET();
+
+    const unsigned long elapsed = millis() - start;
+
+    if (statusCode > 0) {
+      successCount++;
+
+      // Consume the response so the connection can potentially be reused.
+      String responseBody = http.getString();
+
+      logCustom(
+        "[TEST] ",
+        (String)"#" + i +
+        " SUCCESS: HTTP " + statusCode +
+        ", " + elapsed + " ms" +
+        ", body=" + responseBody.length() + " bytes"
+      );
+    } else {
+      failureCount++;
+
+      logCustom(
+        "[TEST] ",
+        (String)"#" + i +
+        " FAILURE: code " + statusCode +
+        ", " + elapsed + " ms" +
+        ", error=" + http.errorToString(statusCode)
+      );
+    }
+
+    delay(100);
   }
+
+  http.end();
+
+  logDebug("");
+  logDebug("HTTP persistent stress test complete");
+  logDebug((String)"Successful: " + successCount);
+  logDebug((String)"Failed:     " + failureCount);
+
+  unsigned int time = millis() - testStart;
+  logDebug((String)"Total time: " + time + " ms");
+
+  logDebug("========================================");
 }
 
 AlertData getSimpleAlerts() {
@@ -96,17 +193,15 @@ AlertData getSimpleAlerts() {
   }
 
   HttpResponse response = sendGetRequest(String(ALERTS_CUSTOM), {});
-  Serial.print("Simple alerts HTTP code: ");
-  Serial.println(response.statusCode);
+  logInfo((String)"Simple alerts HTTP code: " + response.statusCode);
 
   if (response.statusCode == -1) {
-    Serial.println("[WARNING] Network failed. No internet or alerts host is not accessible.");
+    logWarn("Network failed. No internet or alerts host is not accessible.");
     return {-1, CONNECTION_FAILED};
   }
 
   if (response.statusCode != 200) {
-    Serial.print("[WARNING] Status above was not valid. Body: ");
-    Serial.println(response.responseBody);
+    logWarn("Status above was not valid. Body: " + response.responseBody);
     Status status;
     switch(response.statusCode) {
       case 400: status = ERR_400;
@@ -123,7 +218,6 @@ AlertData getSimpleAlerts() {
     }
     return {response.statusCode, status};
   }
-  Serial.println(response.responseBody);
 
   if(response.responseBody == "A") {
     return {200, ALERT_ON};

@@ -1,6 +1,7 @@
 #include <WiFi.h>
 #include <secrets.h>
 #include <network/wificlient.h>
+#include "../logger.h"
 
 const int WIFI_CONNECT_TIMEOUT_MS = 30 * 1000;
 
@@ -10,25 +11,20 @@ void connectToWiFi() {
   delay(500);
 
   WiFi.begin(WIFI_SSID, WIFI_PASS);
-  Serial.println("Connecting...");
+  logInfo("Connecting...");
   unsigned int startTime = millis();
   while (WiFi.status() != WL_CONNECTED &&
          startTime + WIFI_CONNECT_TIMEOUT_MS > millis()) {
     if (WiFi.status() == WL_CONNECT_FAILED) {
-      Serial.println(
-          "Failed to connect to WiFi. Please verify credentials and signal.");
-      Serial.println();
+      logWarn("Failed to connect to WiFi. Please verify credentials and signal.");
     }
-    Serial.println("Waiting for connect...");
+    logInfo("Waiting for connect...");
     delay(5000);
   }
   if (WiFi.status() == WL_CONNECTED) {
-    Serial.println("");
-    Serial.println("WiFi connected. IP address: ");
-    Serial.println(WiFi.localIP());
+    logInfo((String)"WiFi connected. IP address: " + WiFi.localIP());
   } else {
-    Serial.print("Failed to connect to WiFi: ");
-    Serial.println(WiFi.status());
+    logWarn("Failed to connect to WiFi: " + WiFi.status());
   }
 }
 
@@ -38,17 +34,13 @@ bool connectIfNotConnected() {
   }
 
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.print("Failed to connect to WiFi. Status is: ");
-    Serial.println(WiFi.status());
+    logWarn("Failed to connect to WiFi. Status is: " + WiFi.status());
     return false;
   }
 
   int rssi = WiFi.RSSI();
-  Serial.print("Signal Strength (RSSI): ");
-  Serial.print(rssi);
-  Serial.println(" dBm");
-
-  Serial.printf("Free Heap: %d bytes\n", ESP.getFreeHeap());
+  logInfo((String)"Signal Strength (RSSI), dBm: " + rssi);
+  logInfo((String)"Free Heap, bytes: %d bytes" + ESP.getFreeHeap());
 
   return true;
 }

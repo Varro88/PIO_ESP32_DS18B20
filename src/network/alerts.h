@@ -32,5 +32,6 @@ struct AlertData {
 };
 
 
-Status getAlertsV2();
+void testHttpRequests(unsigned long intervalMs);
+void testHttpRequestsPersistent();
 AlertData getSimpleAlerts();
