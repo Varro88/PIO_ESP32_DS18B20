@@ -26,12 +26,19 @@ enum Status {
     RESPONSE_BODY_FAILED
 };
 
-struct AlertData {
+struct AlertStatus {
     int responseCode;
     Status status;
 };
 
+struct AlertReason {
+    int responseCode;
+    bool isValid;
+    bool isAlert; 
+    String reason;
+};
 
 void testHttpRequests(unsigned long intervalMs);
 void testHttpRequestsPersistent();
-AlertData getSimpleAlerts();
+AlertStatus getSimpleAlerts();
+AlertReason getAlertReason();

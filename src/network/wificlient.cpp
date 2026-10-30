@@ -40,7 +40,7 @@ bool connectIfNotConnected() {
 
   int rssi = WiFi.RSSI();
   logInfo((String)"Signal Strength (RSSI), dBm: " + rssi);
-  logInfo((String)"Free Heap, bytes: %d bytes" + ESP.getFreeHeap());
+  logInfo((String)"Free Heap, bytes: " + ESP.getFreeHeap());
 
   return true;
 }

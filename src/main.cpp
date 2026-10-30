@@ -1,7 +1,8 @@
 #include <Adafruit_BME280.h>
 #include <Adafruit_Sensor.h>
 #include <Arduino.h>
-#include <LiquidCrystal_I2C.h>
+//#include <LiquidCrystal_I2C.h>
+#include <LCDI2C_Multilingual.h>
 #include <rom/rtc.h>
 #include <sensors/BME280.h>
 #include <sensors/DS18B20.h>
@@ -17,12 +18,13 @@
 #include "time.h"
 
 String getResetReason(RESET_REASON reason);
+void processSimpleAlert();
 void processAlert();
 void processCalibration();
 void processDaylight();
 void printMeteoData(String t1, String t2, String h, String p, String c);
 void printStatusWithTime(int column, int row, String format);
-void printStatus(AlertData status);
+void printStatus(AlertStatus status);
 void printStatusTime(String time);
 void printAndShow(int row, String text);
 void switchNetworkIndicator(boolean isShown);
@@ -61,12 +63,15 @@ const int MAX_HOURS = 22;
 int hours = 0;
 
 int countSensors;
-LiquidCrystal_I2C lcd(0x27, 20, 4);
+LCDI2C_Russian lcd(0x27, 20, 4);
 int counter = 0;
 String SHORT_DIAGNOSTIC = "";
 Status LAST_STATUS = INIT;
 Status LAST_VALID_STATUS = INIT;
 String LAST_VALID_STATUS_TIME = "";
+
+bool HAD_ALERT = false;
+String LAST_ALERT_CHANGE_TIME = "--:--";
 
 const uint8_t number[] = {
     0xFF, 0x00, 0xFF, 0xFF, 0x01, 0xFF,  // 0
@@ -120,6 +125,8 @@ void setup() {
 
   lcd.noBacklight();
 
+  lcd.clear();
+
   //testHttpRequests(10000);
 }
 
@@ -130,9 +137,18 @@ void loop() {
   // DS18B20
   float outerTemperature = getOuterDS18B20Value();
   float innerTemperature = getInnerDS18B20Value();
+  logInfo("DS18B20:");
+  logInfo((String)outerTemperature);
+  logInfo((String)innerTemperature);
+  logInfo("---");
 
   // BME280
   std::array<float, 3> bme280 = getBME280Measurings();
+  logInfo("BME280:");
+  logInfo((String)bme280[0]);
+  logInfo((String)bme280[1]);
+  logInfo((String)bme280[2]);
+  logInfo("---");
 
   // MHZ19B
   float co2Concentration = getCO2Concentration();
@@ -156,6 +172,7 @@ void loop() {
     lastSendMs = millis();
   }
 
+  //processSimpleAlert();
   processAlert();
 
   logInfo("=====");
@@ -209,10 +226,10 @@ void processDaylight() {
   }
 }
 
-void processAlert() {
+void processSimpleAlert() {
   switchNetworkIndicator(true);
-  AlertData alertData = getSimpleAlerts();
-  Status newStatus = alertData.status;
+  AlertStatus alertStatus = getSimpleAlerts();
+  Status newStatus = alertStatus.status;
   lastGetAlertsMs = millis();
 
   logInfo("New status: ");
@@ -243,15 +260,70 @@ void processAlert() {
           printStatusTime("--:--");
         }
         LAST_VALID_STATUS = newStatus;
-        printStatus(alertData);
+        printStatus(alertStatus);
         break;
-      default: String respCode = String(alertData.responseCode); 
-        printStatus(alertData);
+      default: String respCode = String(alertStatus.responseCode); 
+        printStatus(alertStatus);
         break;
     }
     
     LAST_STATUS = newStatus;
   }
+  switchNetworkIndicator(false);
+}
+
+void processAlert() {
+  switchNetworkIndicator(true);
+  AlertReason alertReason = getAlertReason();
+  String text = "";
+  
+  if(!alertReason.isValid) {
+    logInfo("Alert is not valid");
+    if(hours < MIN_HOURS || hours >= MAX_HOURS) {
+      lcd.noBacklight();
+    }
+    if(alertReason.responseCode == 429) {
+      logInfo("[WARNING] TOO MANY REQUESTS");
+      lastGetAlertsMs += TOO_MANY_REQUESTS_PAUSE_MS;
+    }
+    text = (String)"E." + alertReason.reason;
+  }
+  else if(alertReason.isAlert) {
+    logInfo("Alert is active");
+    logInfo((String)"Hours: " + (String)hours);
+    if(hours >= MIN_HOURS && hours < MAX_HOURS) {
+      lcd.backlight();
+    } else {
+      lcd.noBacklight();
+    }
+    if(!HAD_ALERT) {
+      printStatusTime(getTimeString());
+    }
+    HAD_ALERT = true;
+    text = alertReason.reason;
+  } else {
+    logInfo("No alert");
+    lcd.noBacklight();
+    if(HAD_ALERT) {
+      printStatusTime(getTimeString());
+    }
+    HAD_ALERT = false;
+    text = alertReason.reason;
+  }
+  int statusPosition = 8;
+  for(int i = statusPosition + text.length(); i < LCD_ROW_LENGTH - 1 - 1; i++) {
+    text = text + " ";
+  }
+  //logInfo((String)"Reason length: " + (String)text.length());
+  //logInfo((String)"Reason: '" + text + "'");
+
+  Serial.println("Reason length: " + text.length());
+  Serial.println("Reason: '" + text + "'");
+  //logInfo((String)"Reason: '" + text + "'");
+
+  lcd.setCursor(statusPosition, 0);
+  lcd.print(text);
+
   switchNetworkIndicator(false);
 }
 
@@ -277,10 +349,10 @@ String getTimeString() {
   }
 }
 
-void printStatus(AlertData alertData) {
+void printStatus(AlertStatus alertStatus) {
   lcd.setCursor(5, 0);
   String strStatus = "";
-  switch (alertData.status) {
+  switch (alertStatus.status) {
     case ALERT_ON:
       strStatus = " - ALERT";
       break;
@@ -311,7 +383,7 @@ void printStatus(AlertData alertData) {
     case ERR_502: strStatus = " - ERR_502"; break;
     case ERR_503: strStatus = " - ERR_503"; break;
     case RESPONSE_CODE_FAILED:
-      strStatus = String(alertData.responseCode);
+      strStatus = String(alertStatus.responseCode);
       break;
     case RESPONSE_BODY_FAILED:
       strStatus = " - ERR_RBODY";
@@ -331,7 +403,7 @@ void printStatus(AlertData alertData) {
 
 void printStatusTime(String time) {
   lcd.setCursor(0, 0);
-  lcd.print(time);
+  lcd.print((String)time + " - ");
 }
 
 String getResetReason(RESET_REASON reason) {
@@ -413,6 +485,6 @@ void printAndShowAsLog(String text) {
     while (lcdLog[i].length() <= LCD_ROW_LENGTH) {
       lcdLog[i] += " ";
     }
-    delay(400);
+    delay(750);
   }
 }

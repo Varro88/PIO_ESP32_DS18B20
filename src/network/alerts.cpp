@@ -187,12 +187,12 @@ void testHttpRequestsPersistent() {
   logDebug("========================================");
 }
 
-AlertData getSimpleAlerts() {
+AlertStatus getSimpleAlerts() {
   if (!connectIfNotConnected()) {
     return {-1, Status::WIFI_FAILED};
   }
 
-  HttpResponse response = sendGetRequest(String(ALERTS_CUSTOM), {});
+  HttpResponse response = sendGetRequest(String(ALERTS_STATUS), {});
   logInfo((String)"Simple alerts HTTP code: " + response.statusCode);
 
   if (response.statusCode == -1) {
@@ -227,5 +227,38 @@ AlertData getSimpleAlerts() {
     return {200, NO_ALERT};
   } else {
     return {200, RESPONSE_BODY_FAILED};
+  }
+}
+
+AlertReason getAlertReason() {
+  if (!connectIfNotConnected()) {
+    return {-1, false, false, "WIFI_FAILED"};
+  }
+
+  HttpResponse response = sendGetRequest(String(ALERTS_REASON), {});
+  logInfo((String)"Alerts reason code: " + response.statusCode);
+  logInfo((String)"Alerts reason body: " + response.responseBody);
+
+  if (response.statusCode == -1) {
+    logWarn("Network failed. No internet or alerts host is not accessible.");
+    return {-1, false, false, "CONN_FAILED"};
+  }
+
+  if (response.statusCode != 200) {
+    logWarn("Status above was not valid. Body: " + response.responseBody);
+    return {response.statusCode, "RCODE_FAILED"};
+  }
+
+  if(response.responseBody == "ERROR") {
+    return {response.statusCode, false, false, "ERROR"};
+  }
+  else if (response.responseBody == "INIT") {
+    return {response.statusCode, false, false, "INIT"};
+  }
+  else if (response.responseBody == "CLEAR") {
+    return {response.statusCode, true, false, "ЧИСТО"};
+  }
+  else {
+    return {response.statusCode, true, true, response.responseBody};
   }
 }

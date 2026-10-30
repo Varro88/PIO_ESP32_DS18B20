@@ -58,9 +58,10 @@ float getCO2Concentration() {
   mySerial.flush();
 
   int temp = response[4] - 40;
+  logInfo("MH-Z19H");
   logInfo((String)"Temperature: " + temp);
-  logInfo((String)"Response CO2 from MH-Z19H: " + strResp);
-  logInfo((String)"Response size: " + i);
+  logInfo((String)"CO2: " + strResp);
+  logInfo("---");
 
   if (i < 9) {
     logError("Incomplete response from sensor");
